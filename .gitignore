@@ -16,6 +16,7 @@ local.properties
 .DS_Store
 
 # Keystore
+openlist.properties
 *.p12
 signing.properties
 *.jks
@@ -24,4 +25,5 @@ signing.properties
 # Logs
 *.log
 tmp/
+
 
