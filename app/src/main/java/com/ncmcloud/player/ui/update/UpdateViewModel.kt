@@ -13,7 +13,8 @@ sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data class Available(val info: UpdateInfo) : UpdateState
-    data object Downloading : UpdateState
+    data class Downloading(val progress: Float) : UpdateState
+    data object Installing : UpdateState
     data class Error(val message: String) : UpdateState
 }
 
@@ -35,8 +36,10 @@ class UpdateViewModel(private val updateService: UpdateService) : ViewModel() {
     fun download() {
         val info = (_state.value as? UpdateState.Available)?.info ?: return
         viewModelScope.launch {
-            _state.value = UpdateState.Downloading
-            _state.value = runCatching { updateService.downloadAndInstall(info) }
+            _state.value = UpdateState.Downloading(-1f)
+            _state.value = runCatching { updateService.downloadAndInstall(info) { p ->
+                _state.value = UpdateState.Downloading(p)
+            } }
                 .fold(
                     onSuccess = { UpdateState.Idle },
                     onFailure = { UpdateState.Error(it.message ?: "下载或安装失败") },

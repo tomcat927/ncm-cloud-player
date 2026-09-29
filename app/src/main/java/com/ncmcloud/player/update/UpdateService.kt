@@ -117,7 +117,7 @@ class UpdateService(private val context: Context) {
         val file = File(dir, "ncm-cloud-player-update.apk")
         if (file.exists()) file.delete()
 
-        downloadTo(info.downloadUrl, file) ?: downloadTo(info.fallbackDownloadUrl, file)
+        downloadTo(info.downloadUrl, file, onProgress) ?: downloadTo(info.fallbackDownloadUrl, file, onProgress)
             ?: throw IllegalStateException("APK 下载失败")
 
         val expected = readChecksum(info.checksumUrl) ?: readChecksum(info.fallbackChecksumUrl)
@@ -141,13 +141,24 @@ class UpdateService(private val context: Context) {
         context.startActivity(intent)
     }
 
-    private fun downloadTo(url: String, target: File): Boolean {
+    private fun downloadTo(url: String, target: File, onProgress: (Float) -> Unit): Boolean {
         return try {
             val request = Request.Builder().url(url).build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return false
-                response.body?.byteStream()?.use { input ->
-                    target.outputStream().use { output -> input.copyTo(output) }
+                val body = response.body ?: return false
+                val total = body.contentLength()
+                val input = body.byteStream()
+                target.outputStream().use { output ->
+                    val buffer = ByteArray(8192)
+                    var received = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read <= 0) break
+                        output.write(buffer, 0, read)
+                        received += read
+                        if (total > 0) onProgress((received.toFloat() / total).coerceIn(0f, 1f))
+                    }
                 }
             }
             target.exists() && target.length() > 0
@@ -201,6 +212,8 @@ class UpdateService(private val context: Context) {
         return epoch
     }
 }
+
+
 
 
 
