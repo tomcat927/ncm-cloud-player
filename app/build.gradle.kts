@@ -21,6 +21,9 @@ val releaseStorePassword = signingValue("RELEASE_STORE_PASSWORD", "RELEASE_STORE
 val releaseKeyAlias = signingValue("RELEASE_KEY_ALIAS", "RELEASE_KEY_ALIAS")
 val releaseKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "RELEASE_KEY_PASSWORD")
 
+val releaseVersionCode = (project.findProperty("releaseVersionCode") as String?)?.toIntOrNull()
+val releaseVersionName = (project.findProperty("releaseVersionName") as String?)
+
 val hasReleaseSigning = releaseStoreFile != null &&
         releaseStorePassword != null &&
         releaseKeyAlias != null &&
@@ -39,8 +42,8 @@ android {
         applicationId = "com.ncmcloud.player"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = releaseVersionCode ?: 1
+        versionName = releaseVersionName ?: "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -119,3 +122,4 @@ dependencies {
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+

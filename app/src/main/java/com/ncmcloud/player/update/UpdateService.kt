@@ -1,0 +1,203 @@
+package com.ncmcloud.player.update
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.core.content.FileProvider
+import com.ncmcloud.player.core.log.AppLogger
+import android.os.Build
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.io.File
+import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
+
+private const val TAG = "UpdateService"
+private const val OWNER = "tomcat927"
+private const val REPO = "ncm-cloud-player"
+private const val PROXY_PREFIX = "https://gh-proxy.com/"
+
+data class UpdateInfo(
+    val tagName: String,
+    val versionCode: Long,
+    val downloadUrl: String,
+    val fallbackDownloadUrl: String,
+    val checksumUrl: String,
+    val fallbackChecksumUrl: String,
+    val releaseUrl: String,
+    val releaseNotes: String?,
+)
+
+class UpdateService(private val context: Context) {
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(20, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .build()
+
+    private val manifestUrls = listOf(
+        "https://github.com/$OWNER/$REPO/releases/latest/download/latest.json",
+        "${PROXY_PREFIX}https://github.com/$OWNER/$REPO/releases/latest/download/latest.json",
+    )
+
+    private val apiUrl = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
+
+    suspend fun checkForUpdate(): UpdateInfo? = withContext(Dispatchers.IO) {
+        val currentVersionCode = currentVersionCode()
+        val info = checkFromManifest() ?: checkFromGitHubApi()
+        if (info == null) {
+            AppLogger.i(TAG, "未获取到更新信息")
+            return null
+        }
+        AppLogger.i(TAG, "current=$currentVersionCode latest=${info.versionCode}")
+        return if (info.versionCode > currentVersionCode) info else null
+    }
+
+    private fun currentVersionCode(): Long {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+    }
+
+    private suspend fun checkFromManifest(): UpdateInfo? {
+        for (url in manifestUrls) {
+            val body = readText(url) ?: continue
+            val json = runCatching { JSONObject(body) }.getOrNull() ?: continue
+            val versionCode = json.optLong("version_code", -1L)
+            val apk = json.optString("apk")
+            val githubApk = json.optString("github_apk")
+            if (versionCode <= 0 || apk.isEmpty() || githubApk.isEmpty()) continue
+            return UpdateInfo(
+                tagName = json.optString("tag_name"),
+                versionCode = versionCode,
+                downloadUrl = apk,
+                fallbackDownloadUrl = githubApk,
+                checksumUrl = json.optString("apk_sha256"),
+                fallbackChecksumUrl = json.optString("github_apk_sha256"),
+                releaseUrl = json.optString("release_url"),
+                releaseNotes = json.optString("release_notes", null).takeIf { it.isNotBlank() },
+            )
+        }
+        return null
+    }
+
+    private suspend fun checkFromGitHubApi(): UpdateInfo? {
+        val body = readText(apiUrl, mapOf("Accept" to "application/vnd.github+json", "User-Agent" to REPO))
+            ?: return null
+        val json = runCatching { JSONObject(body) }.getOrNull() ?: return null
+        val tagName = json.optString("tag_name")
+        val assets = json.optJSONArray("assets") ?: return null
+        var apkUrl = ""
+        var checksumUrl = ""
+        for (i in 0 until assets.length()) {
+            val asset = assets.getJSONObject(i)
+            val name = asset.optString("name")
+            val url = asset.optString("browser_download_url")
+            if (name.endsWith(".apk")) apkUrl = url
+            else if (name.endsWith(".apk.sha256")) checksumUrl = url
+        }
+        if (apkUrl.isEmpty()) return null
+        val versionCode = versionCodeFromTag(tagName) ?: return 0L
+        return UpdateInfo(
+            tagName = tagName,
+            versionCode = versionCode,
+            downloadUrl = "${PROXY_PREFIX}$apkUrl",
+            fallbackDownloadUrl = apkUrl,
+            checksumUrl = "${PROXY_PREFIX}$checksumUrl",
+            fallbackChecksumUrl = checksumUrl,
+            releaseUrl = json.optString("html_url"),
+            releaseNotes = json.optString("body", null).takeIf { it.isNotBlank() },
+        )
+    }
+
+    suspend fun downloadAndInstall(info: UpdateInfo) = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "apk_updates").apply { mkdirs() }
+        val file = File(dir, "ncm-cloud-player-update.apk")
+        if (file.exists()) file.delete()
+
+        downloadTo(info.downloadUrl, file) ?: downloadTo(info.fallbackDownloadUrl, file)
+            ?: throw IllegalStateException("APK 下载失败")
+
+        val expected = readChecksum(info.checksumUrl) ?: readChecksum(info.fallbackChecksumUrl)
+        if (expected != null) {
+            val actual = sha256(file)
+            if (!actual.equals(expected, ignoreCase = true)) {
+                throw IllegalStateException("SHA-256 校验失败")
+            }
+        }
+        installApk(file)
+    }
+
+    private fun installApk(file: File) {
+        val authority = "${context.packageName}.fileprovider"
+        val uri = FileProvider.getUriForFile(context, authority, file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, "application/vnd.android.package-archive")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+
+    private fun downloadTo(url: String, target: File): Boolean {
+        return try {
+            val request = Request.Builder().url(url).build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return false
+                response.body?.byteStream()?.use { input ->
+                    target.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            target.exists() && target.length() > 0
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "下载失败: $url", e)
+            false
+        }
+    }
+
+    private suspend fun readText(url: String, headers: Map<String, String> = emptyMap()): String? {
+        return try {
+            val builder = Request.Builder().url(url)
+            headers.forEach { (k, v) -> builder.header(k, v) }
+            client.newCall(builder.build()).execute().use { response ->
+                if (!response.isSuccessful) return null
+                response.body?.string()
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "请求失败: $url", e)
+            null
+        }
+    }
+
+    private suspend fun readChecksum(url: String): String? {
+        val text = readText(url) ?: return null
+        val value = text.trim().split(Regex("\\s+")).firstOrNull()
+        return value?.takeIf { it.length == 64 }
+    }
+
+    private fun sha256(file: File): String {
+        val md = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(8192)
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                md.update(buffer, 0, read)
+            }
+        }
+        return md.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun versionCodeFromTag(tag: String): Long? {
+        val match = Regex("-(\\d{8})(\\d{2})(\\d{2})(\\d{2})$").find(tag) ?: return null
+        val (date, hour, minute, second) = match.destructured
+        val year = date.substring(0, 4).toInt()
+        val month = date.substring(4, 6).toInt()
+        val day = date.substring(6, 8).toInt()
+        val beijing = java.time.LocalDateTime.of(year, month, day, hour.toInt(), minute.toInt(), second.toInt())
+        val epoch = beijing.atZone(java.time.ZoneId.of("Asia/Shanghai")).toEpochSecond()
+        return epoch
+    }
+}
+

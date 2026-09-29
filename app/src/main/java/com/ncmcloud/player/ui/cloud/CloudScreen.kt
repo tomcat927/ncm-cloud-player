@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,18 +38,22 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.ui.player.PlayerBar
+import com.ncmcloud.player.ui.update.UpdateDialog
+import com.ncmcloud.player.ui.update.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CloudScreen() {
     val viewModel: CloudViewModel = koinViewModel()
+    val updateViewModel: UpdateViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) { updateViewModel.check() }
 
     Scaffold(
         topBar = {
@@ -55,6 +62,9 @@ fun CloudScreen() {
                 actions = {
                     IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
                         Icon(Icons.Filled.Search, contentDescription = "搜索")
+                    }
+                    IconButton(onClick = { updateViewModel.check() }) {
+                        Icon(Icons.Filled.SystemUpdateAlt, contentDescription = "检查更新")
                     }
                     IconButton(onClick = { viewModel.logout() }) {
                         Icon(Icons.Filled.Logout, contentDescription = "退出登录")
@@ -130,6 +140,7 @@ fun CloudScreen() {
             PlayerBar(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
         }
     }
+    UpdateDialog()
 }
 
 @Composable
