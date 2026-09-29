@@ -61,7 +61,6 @@ jobs:
         run: chmod +x gradlew
 
       - name: Decode signing key
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
         run: |
           mkdir -p signing
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > signing/release.p12
