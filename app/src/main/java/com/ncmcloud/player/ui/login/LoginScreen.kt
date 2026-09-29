@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.SystemUpdateAlt
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,7 +53,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen(onOpenLogs: () -> Unit) {
+fun LoginScreen(onOpenLogs: () -> Unit, onCheckUpdate: () -> Unit) {
     val viewModel: LoginViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val qrState by viewModel.qrState.collectAsState()
@@ -68,6 +69,9 @@ fun LoginScreen(onOpenLogs: () -> Unit) {
             TopAppBar(
                 title = { Text("登录网易云音乐") },
                 actions = {
+                    IconButton(onClick = onCheckUpdate) {
+                        Icon(Icons.Filled.SystemUpdateAlt, contentDescription = "检查更新")
+                    }
                     IconButton(onClick = onOpenLogs) {
                         Icon(Icons.Filled.BugReport, contentDescription = "诊断日志")
                     }
@@ -269,4 +273,5 @@ private fun QrCodeImage(matrix: BitMatrix) {
         }
     }
 }
+
 

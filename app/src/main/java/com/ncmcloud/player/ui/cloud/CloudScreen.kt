@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SystemUpdateAlt
+
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,20 +42,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.ui.player.PlayerBar
-import com.ncmcloud.player.ui.update.UpdateDialog
-import com.ncmcloud.player.ui.update.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloudScreen(onOpenLogs: () -> Unit) {
+fun CloudScreen(onOpenLogs: () -> Unit, onCheckUpdate: () -> Unit) {
     val viewModel: CloudViewModel = koinViewModel()
-    val updateViewModel: UpdateViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) { updateViewModel.check() }
 
     Scaffold(
         topBar = {
@@ -67,7 +64,7 @@ fun CloudScreen(onOpenLogs: () -> Unit) {
                     IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
                         Icon(Icons.Filled.Search, contentDescription = "搜索")
                     }
-                    IconButton(onClick = { updateViewModel.check() }) {
+                    IconButton(onClick = onCheckUpdate) {
                         Icon(Icons.Filled.SystemUpdateAlt, contentDescription = "检查更新")
                     }
                     IconButton(onClick = { viewModel.logout() }) {
@@ -144,7 +141,6 @@ fun CloudScreen(onOpenLogs: () -> Unit) {
             PlayerBar(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
         }
     }
-    UpdateDialog()
 }
 
 @Composable
@@ -176,4 +172,5 @@ private fun CloudSongRow(song: CloudSong, onClick: () -> Unit) {
         Text("${song.bitrate / 1000}kbps", style = MaterialTheme.typography.labelSmall)
     }
 }
+
 
