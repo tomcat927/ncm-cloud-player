@@ -8,6 +8,8 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -167,7 +169,7 @@ class RemoteLogService(
         return value
     }
 
-    private fun login(baseUrl: String, username: String, password: String): String {
+    private suspend fun login(baseUrl: String, username: String, password: String): String = withContext(Dispatchers.IO) {
         val digest = sha256("$password-$salt")
         val body = JSONObject()
             .put("username", username)
@@ -184,11 +186,11 @@ class RemoteLogService(
             if (payload.optInt("code") != 200 || token.isEmpty()) {
                 throw IllegalStateException(payload.optString("message", "OpenList 登录失败"))
             }
-            return token
+            token
         }
     }
 
-    private fun ensureDirectory(baseUrl: String, token: String, path: String) {
+    private suspend fun ensureDirectory(baseUrl: String, token: String, path: String) = withContext(Dispatchers.IO) {
         val body = JSONObject().put("path", path).toString()
         val request = Request.Builder()
             .url("$baseUrl/api/fs/mkdir")
@@ -205,7 +207,7 @@ class RemoteLogService(
         }
     }
 
-    private fun upload(baseUrl: String, token: String, remotePath: String, bytes: ByteArray) {
+    private suspend fun upload(baseUrl: String, token: String, remotePath: String, bytes: ByteArray) = withContext(Dispatchers.IO) {
         val request = Request.Builder()
             .url("$baseUrl/api/fs/put")
             .header("Authorization", token)
@@ -222,7 +224,7 @@ class RemoteLogService(
         }
     }
 
-    private fun uploadWithToken(baseUrl: String, token: String, remoteDir: String, remotePath: String, bytes: ByteArray) {
+    private suspend fun uploadWithToken(baseUrl: String, token: String, remoteDir: String, remotePath: String, bytes: ByteArray) = withContext(Dispatchers.IO) {
         ensureDirectory(baseUrl, token, remoteDir)
         upload(baseUrl, token, remotePath, bytes)
     }
@@ -271,6 +273,7 @@ class RemoteLogService(
 
     private class AuthException(message: String) : Exception(message)
 }
+
 
 
 
