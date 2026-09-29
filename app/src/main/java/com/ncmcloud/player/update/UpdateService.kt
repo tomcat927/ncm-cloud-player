@@ -33,13 +33,13 @@ data class UpdateInfo(
 
 class UpdateService(private val context: Context) {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     private val manifestUrls = listOf(
-        "https://github.com/$OWNER/$REPO/releases/latest/download/latest.json",
         "${PROXY_PREFIX}https://github.com/$OWNER/$REPO/releases/latest/download/latest.json",
+        "https://github.com/$OWNER/$REPO/releases/latest/download/latest.json",
     )
 
     private val apiUrl = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
@@ -201,5 +201,6 @@ class UpdateService(private val context: Context) {
         return epoch
     }
 }
+
 
 
