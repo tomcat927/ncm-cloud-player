@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
@@ -46,7 +47,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloudScreen() {
+fun CloudScreen(onOpenLogs: () -> Unit) {
     val viewModel: CloudViewModel = koinViewModel()
     val updateViewModel: UpdateViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
@@ -60,6 +61,9 @@ fun CloudScreen() {
             TopAppBar(
                 title = { Text("云盘歌曲") },
                 actions = {
+                    IconButton(onClick = onOpenLogs) {
+                        Icon(Icons.Filled.BugReport, contentDescription = "诊断日志")
+                    }
                     IconButton(onClick = { showSearch = !showSearch; if (!showSearch) query = "" }) {
                         Icon(Icons.Filled.Search, contentDescription = "搜索")
                     }
@@ -172,3 +176,4 @@ private fun CloudSongRow(song: CloudSong, onClick: () -> Unit) {
         Text("${song.bitrate / 1000}kbps", style = MaterialTheme.typography.labelSmall)
     }
 }
+

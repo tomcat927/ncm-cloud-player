@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -50,7 +52,7 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LoginScreen() {
+fun LoginScreen(onOpenLogs: () -> Unit) {
     val viewModel: LoginViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val qrState by viewModel.qrState.collectAsState()
@@ -62,7 +64,16 @@ fun LoginScreen() {
         if (selectedTab != 2) viewModel.resetSmsState()
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("登录网易云音乐") }) }) { padding ->
+    Scaffold(topBar = {
+            TopAppBar(
+                title = { Text("登录网易云音乐") },
+                actions = {
+                    IconButton(onClick = onOpenLogs) {
+                        Icon(Icons.Filled.BugReport, contentDescription = "诊断日志")
+                    }
+                },
+            )
+        }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -258,3 +269,4 @@ private fun QrCodeImage(matrix: BitMatrix) {
         }
     }
 }
+

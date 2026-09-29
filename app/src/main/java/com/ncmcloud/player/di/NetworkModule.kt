@@ -7,6 +7,7 @@ import com.ncmcloud.player.core.network.CryptoInterceptor
 import com.ncmcloud.player.core.network.EmptyBodyInterceptor
 import com.ncmcloud.player.core.network.HeaderInterceptor
 import com.ncmcloud.player.core.network.NeteaseEndpoints
+import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
 import com.ncmcloud.player.core.network.RealIpProvider
 import com.ncmcloud.player.core.network.crypto.XeapiKeyStore
 import com.ncmcloud.player.core.network.crypto.XeapiKeyStoreImpl
@@ -37,6 +38,7 @@ val networkModule = module {
 
     single { RealIpProvider() }
     single { EmptyBodyInterceptor() }
+    single { NetworkLoggingInterceptor() }
 
     single<XeapiKeyStore> {
         val appDataStore: DataStore<Preferences> = get(qualifier = named("app"))
@@ -51,6 +53,7 @@ val networkModule = module {
             .addInterceptor(get<EmptyBodyInterceptor>())
             .addInterceptor(get<HeaderInterceptor>())
             .addInterceptor(get<CryptoInterceptor>())
+            .addInterceptor(get<NetworkLoggingInterceptor>())
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BASIC
