@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private const val TAG = "PlayerController"
 
@@ -55,8 +56,8 @@ class PlayerController(
     private var queueList: List<CloudSong> = emptyList()
     private var currentIndexValue = -1
 
-    fun connect() {
-        if (controller != null) return
+    suspend fun connect() = withContext(Dispatchers.IO) {
+        if (controller != null) return@withContext
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
         controller = MediaController.Builder(context, token).buildAsync().get()
         controller?.addListener(object : Player.Listener {
@@ -161,3 +162,4 @@ class PlayerController(
         _canSkipPrevious.value = currentIndexValue > 0
     }
 }
+
