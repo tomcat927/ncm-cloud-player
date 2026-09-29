@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
 import kotlinx.coroutines.flow.first
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -50,7 +51,8 @@ class RemoteLogService(
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
+        .addInterceptor(NetworkLoggingInterceptor())
+        .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
@@ -97,7 +99,12 @@ class RemoteLogService(
         if (username.isBlank() || effectivePassword.isEmpty()) {
             throw IllegalArgumentException("请填写 OpenList 用户名和密码")
         }
-        login(normalizedUrl, username.trim(), effectivePassword)
+        try {
+            login(normalizedUrl, username.trim(), effectivePassword)
+        } catch (e: Exception) {
+            AppLogger.e("RemoteLog", "测试连接失败: $normalizedUrl", e)
+            throw e
+        }
         return true
     }
 
@@ -221,7 +228,11 @@ class RemoteLogService(
     }
 
     private fun decodeResponse(body: String): JSONObject =
-        runCatching { JSONObject(body) }.getOrElse { throw IllegalStateException("OpenList 请求失败") }
+        runCatching { JSONObject(body) }.getOrElse {
+            val snippet = body.take(500)
+            AppLogger.w("RemoteLog", "OpenList 响应非 JSON: $snippet")
+            throw IllegalStateException("OpenList 请求失败: ${body.take(200)}")
+        }
 
     private fun sha256(input: String): String {
         val md = MessageDigest.getInstance("SHA-256")
@@ -260,4 +271,6 @@ class RemoteLogService(
 
     private class AuthException(message: String) : Exception(message)
 }
+
+
 
