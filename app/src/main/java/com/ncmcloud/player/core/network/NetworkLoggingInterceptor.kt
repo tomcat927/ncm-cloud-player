@@ -25,6 +25,9 @@ class NetworkLoggingInterceptor : Interceptor {
         val response = chain.proceed(request)
         val respBody = runCatching { response.peekBody(256 * 1024).string() }.getOrNull().orEmpty()
         AppLogger.i(TAG, "<< $response.code $url")
+        response.headers("Set-Cookie").takeIf { it.isNotEmpty() }?.let {
+            AppLogger.i(TAG, "<< set-cookie: ${it.joinToString(" | ").take(1024)}")
+        }
         if (respBody.isNotEmpty()) {
             AppLogger.i(TAG, "<< body: ${respBody.take(MAX_BODY)}")
         }
@@ -45,3 +48,4 @@ class NetworkLoggingInterceptor : Interceptor {
         }
     }
 }
+

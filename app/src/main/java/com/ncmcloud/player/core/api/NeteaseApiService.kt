@@ -41,8 +41,8 @@ interface NeteaseApiService {
         @Body body: CaptchaSentRequest
     ): CaptchaSentResponse
 
-    // 手机号验证码登录；Cookie 经由 Set-Cookie 响应头下发
-    @POST("/api/w/login/cellphone")
+        // 手机号验证码登录（eapi，与验证码 v1 同域共享会话）
+    @POST("/eapi/w/login/cellphone")
     suspend fun loginCellphone(
         @Body body: LoginCellphoneRequest
     ): Response<LoginCellphoneResponse>
@@ -141,5 +141,7 @@ data class LoginCellphoneResponse(
     val code: Int = 0,
     val profile: UserProfile? = null
 )
+
+
 
 

@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +153,7 @@ class RemoteLogService(
         val redacted = redact(logs)
         return buildString {
             appendLine("ncm-cloud-player diagnostic log")
+            appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
             appendLine("Generated: ${Date()}")
             appendLine("Privacy: redacted snapshot; credentials and personal content removed")
             appendLine()
@@ -273,6 +275,7 @@ class RemoteLogService(
 
     private class AuthException(message: String) : Exception(message)
 }
+
 
 
 
