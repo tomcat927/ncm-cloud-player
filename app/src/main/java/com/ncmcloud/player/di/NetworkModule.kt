@@ -8,6 +8,7 @@ import com.ncmcloud.player.core.network.EmptyBodyInterceptor
 import com.ncmcloud.player.core.network.HeaderInterceptor
 import com.ncmcloud.player.core.network.NeteaseEndpoints
 import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
+import com.ncmcloud.player.core.log.RemoteLogService
 import com.ncmcloud.player.core.network.RealIpProvider
 import com.ncmcloud.player.core.network.crypto.XeapiKeyStore
 import com.ncmcloud.player.core.network.crypto.XeapiKeyStoreImpl
@@ -87,4 +88,6 @@ val preferenceModule = module {
     }
     single { UserPreferences(get(qualifier = named("app"))) }
     single { SettingsPreferences(get(qualifier = named("app"))) }
+    single { RemoteLogService(get(), get(qualifier = named("app"))) }
 }
+
