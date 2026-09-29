@@ -1,0 +1,24 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Build files
+build/
+.cxx/
+.gradle/
+local.properties
+
+# IntelliJ/Android Studio
+*.iml
+.idea/
+.DS_Store
+
+# Keystore
+*.jks
+*.keystore
+
+# Logs
+*.log
+tmp/
