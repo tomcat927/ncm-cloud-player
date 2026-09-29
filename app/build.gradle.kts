@@ -1,8 +1,31 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
 }
+
+// 签名材料一律来自仓库外：本地读 signing.properties，CI 读同名环境变量。
+// 四项缺任意一项即视为未配置，release 退回调试签名，便于本地随时打包验证。
+val signingProps = Properties().apply {
+    val file = rootProject.file("signing.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun signingValue(key: String, env: String): String? =
+    signingProps.getProperty(key) ?: System.getenv(env)
+
+val releaseStoreFile = signingValue("RELEASE_STORE_FILE", "RELEASE_STORE_FILE")
+val releaseStorePassword = signingValue("RELEASE_STORE_PASSWORD", "RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = signingValue("RELEASE_KEY_ALIAS", "RELEASE_KEY_ALIAS")
+val releaseKeyPassword = signingValue("RELEASE_KEY_PASSWORD", "RELEASE_KEY_PASSWORD")
+
+val hasReleaseSigning = releaseStoreFile != null &&
+        releaseStorePassword != null &&
+        releaseKeyAlias != null &&
+        releaseKeyPassword != null &&
+        rootProject.file(releaseStoreFile).exists()
 
 android {
     namespace = "com.ncmcloud.player"
@@ -21,13 +44,30 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 
@@ -40,6 +80,10 @@ android {
         compose = true
         buildConfig = true
     }
+}
+
+base {
+    archivesName.set("ncm-cloud-player-v${android.defaultConfig.versionName}")
 }
 
 dependencies {
@@ -75,4 +119,3 @@ dependencies {
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
-
