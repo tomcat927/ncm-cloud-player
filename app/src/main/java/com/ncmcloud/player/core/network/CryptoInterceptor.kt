@@ -28,6 +28,7 @@ class CryptoInterceptor(private val xeapiKeyStore: XeapiKeyStore) : Interceptor 
         val cryptoType = resolveCryptoType(url) ?: return chain.proceed(originalRequest)
         val rawJson = originalBody.readString()
         val cookies = originalRequest.header("Cookie") ?: ""
+        AppLogger.i("Crypto", ">> raw $url: ${rawJson.take(2048)}")
 
         val encryptedForm = when (cryptoType) {
             CryptoType.WEAPI -> buildWeApiForm(rawJson, cookies)
@@ -195,4 +196,5 @@ class CryptoInterceptor(private val xeapiKeyStore: XeapiKeyStore) : Interceptor 
         return if (idx != -1) url.substring(idx) else url
     }
 }
+
 
