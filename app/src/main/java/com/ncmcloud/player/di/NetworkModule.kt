@@ -7,6 +7,7 @@ import com.ncmcloud.player.core.network.CryptoInterceptor
 import com.ncmcloud.player.core.network.EmptyBodyInterceptor
 import com.ncmcloud.player.core.network.HeaderInterceptor
 import com.ncmcloud.player.core.network.NeteaseEndpoints
+import com.ncmcloud.player.core.network.MemoryCookieJar
 import com.ncmcloud.player.core.network.NetworkLoggingInterceptor
 import com.ncmcloud.player.core.log.RemoteLogService
 import com.ncmcloud.player.core.network.RealIpProvider
@@ -38,6 +39,7 @@ val networkModule = module {
     }
 
     single { RealIpProvider() }
+    single { MemoryCookieJar() }
     single { EmptyBodyInterceptor() }
     single { NetworkLoggingInterceptor() }
 
@@ -47,7 +49,7 @@ val networkModule = module {
     }
 
     single { CryptoInterceptor(get()) }
-    single { HeaderInterceptor(get(), get(), get()) }
+    single { HeaderInterceptor(get(), get(), get(), get()) }
 
     single {
         OkHttpClient.Builder()
@@ -55,6 +57,7 @@ val networkModule = module {
             .addInterceptor(get<HeaderInterceptor>())
             .addInterceptor(get<CryptoInterceptor>())
             .addInterceptor(get<NetworkLoggingInterceptor>())
+            .cookieJar(get<MemoryCookieJar>())
             .addInterceptor(
                 HttpLoggingInterceptor().apply {
                     level = HttpLoggingInterceptor.Level.BASIC
@@ -90,4 +93,5 @@ val preferenceModule = module {
     single { SettingsPreferences(get(qualifier = named("app"))) }
     single { RemoteLogService(get(), get(qualifier = named("app"))) }
 }
+
 
