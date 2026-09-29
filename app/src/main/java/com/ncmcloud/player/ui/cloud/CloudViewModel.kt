@@ -2,6 +2,7 @@ package com.ncmcloud.player.ui.cloud
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ncmcloud.player.data.AuthRepository
 import com.ncmcloud.player.data.CloudRepository
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.playback.PlayerController
@@ -19,6 +20,7 @@ sealed interface CloudState {
 class CloudViewModel(
     private val cloudRepository: CloudRepository,
     private val playerController: PlayerController,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow<CloudState>(CloudState.Loading)
     val state: StateFlow<CloudState> = _state.asStateFlow()
@@ -60,5 +62,9 @@ class CloudViewModel(
                 }
             }.onFailure { _state.value = CloudState.Error(it.message ?: "播放失败") }
         }
+    }
+
+    fun logout() {
+        viewModelScope.launch { authRepository.logout() }
     }
 }

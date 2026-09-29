@@ -46,8 +46,14 @@ class PlayerController(
     private val _canSkipPrevious = MutableStateFlow(false)
     val canSkipPrevious: StateFlow<Boolean> = _canSkipPrevious
 
-    private var queue: List<CloudSong> = emptyList()
-    private var currentIndex = -1
+    private val _queue = MutableStateFlow<List<CloudSong>>(emptyList())
+    val queue: StateFlow<List<CloudSong>> = _queue
+
+    private val _currentIndex = MutableStateFlow(-1)
+    val currentIndex: StateFlow<Int> = _currentIndex
+
+    private var queueList: List<CloudSong> = emptyList()
+    private var currentIndexValue = -1
 
     fun connect() {
         if (controller != null) return
@@ -68,22 +74,32 @@ class PlayerController(
 
     suspend fun playQueue(songs: List<CloudSong>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
-        queue = songs
-        currentIndex = startIndex.coerceIn(0, songs.lastIndex)
+        queueList = songs
+        currentIndexValue = startIndex.coerceIn(0, songs.lastIndex)
+        publishQueue()
         playCurrent()
     }
 
     suspend fun play(song: CloudSong) = playQueue(listOf(song), 0)
 
     fun skipToNext() {
-        if (currentIndex < 0 || currentIndex >= queue.lastIndex) return
-        currentIndex++
+        if (currentIndexValue < 0 || currentIndexValue >= queueList.lastIndex) return
+        currentIndexValue++
+        publishQueue()
         launchPlayCurrent()
     }
 
     fun skipToPrevious() {
-        if (currentIndex <= 0) return
-        currentIndex--
+        if (currentIndexValue <= 0) return
+        currentIndexValue--
+        publishQueue()
+        launchPlayCurrent()
+    }
+
+    fun playAtIndex(index: Int) {
+        if (index < 0 || index >= queueList.size) return
+        currentIndexValue = index
+        publishQueue()
         launchPlayCurrent()
     }
 
@@ -94,8 +110,9 @@ class PlayerController(
 
     fun stop() {
         controller?.stop()
-        queue = emptyList()
-        currentIndex = -1
+        queueList = emptyList()
+        currentIndexValue = -1
+        publishQueue()
         _nowPlaying.value = null
         updateSkipFlags()
     }
@@ -108,8 +125,8 @@ class PlayerController(
     }
 
     private suspend fun playCurrent() {
-        if (currentIndex < 0 || currentIndex >= queue.size) return
-        val song = queue[currentIndex]
+        if (currentIndexValue < 0 || currentIndexValue >= queueList.size) return
+        val song = queueList[currentIndexValue]
         val level = settingsPreferences.playQuality.first()
         val url = runCatching { playbackRepository.getSongUrl(song.songId, level) }
             .onFailure { AppLogger.e(TAG, "获取播放地址失败: ${song.songId}", it) }
@@ -134,9 +151,13 @@ class PlayerController(
         updateSkipFlags()
     }
 
+    private fun publishQueue() {
+        _queue.value = queueList
+        _currentIndex.value = currentIndexValue
+    }
+
     private fun updateSkipFlags() {
-        _canSkipNext.value = currentIndex in 0 until queue.lastIndex
-        _canSkipPrevious.value = currentIndex > 0
+        _canSkipNext.value = currentIndexValue in 0 until queueList.lastIndex
+        _canSkipPrevious.value = currentIndexValue > 0
     }
 }
-
