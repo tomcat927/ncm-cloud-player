@@ -37,12 +37,23 @@ sealed interface QrLoginState {
     data class Error(val message: String) : QrLoginState
 }
 
+sealed interface SmsLoginState {
+    data object Idle : SmsLoginState
+    data object Sending : SmsLoginState
+    data object CodeSent : SmsLoginState
+    data object LoggingIn : SmsLoginState
+    data class Error(val message: String) : SmsLoginState
+}
+
 class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
     private val _state = MutableStateFlow<LoginState>(LoginState.Idle)
     val state: StateFlow<LoginState> = _state.asStateFlow()
 
     private val _qrState = MutableStateFlow<QrLoginState>(QrLoginState.Idle)
     val qrState: StateFlow<QrLoginState> = _qrState.asStateFlow()
+
+    private val _smsState = MutableStateFlow<SmsLoginState>(SmsLoginState.Idle)
+    val smsState: StateFlow<SmsLoginState> = _smsState.asStateFlow()
 
     private var pollJob: Job? = null
 
@@ -133,6 +144,43 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
     fun resetQrState() {
         stopQrPolling()
         _qrState.value = QrLoginState.Idle
+    }
+
+    fun sendCaptcha(phone: String) {
+        if (phone.isBlank()) {
+            _smsState.value = SmsLoginState.Error("请输入手机号")
+            return
+        }
+        viewModelScope.launch {
+            _smsState.value = SmsLoginState.Sending
+            _smsState.value = runCatching { authRepository.sendCaptcha(phone) }
+                .fold(
+                    onSuccess = { SmsLoginState.CodeSent },
+                    onFailure = { SmsLoginState.Error(it.message ?: "验证码发送失败") },
+                )
+        }
+    }
+
+    fun loginWithCaptcha(phone: String, captcha: String) {
+        if (phone.isBlank() || captcha.isBlank()) {
+            _smsState.value = SmsLoginState.Error("请输入手机号和验证码")
+            return
+        }
+        viewModelScope.launch {
+            _smsState.value = SmsLoginState.LoggingIn
+            _smsState.value = runCatching { authRepository.loginWithCaptcha(phone, captcha) }
+                .fold(
+                    onSuccess = { SmsLoginState.CodeSent },
+                    onFailure = { SmsLoginState.Error(it.message ?: "登录失败") },
+                )
+            if (_smsState.value is SmsLoginState.CodeSent) {
+                _state.value = LoginState.Success
+            }
+        }
+    }
+
+    fun resetSmsState() {
+        _smsState.value = SmsLoginState.Idle
     }
 
     private fun generateQrMatrix(content: String): BitMatrix =

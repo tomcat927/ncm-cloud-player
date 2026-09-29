@@ -2,7 +2,6 @@ package com.ncmcloud.player.ui.login
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.google.zxing.common.BitMatrix
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,7 +54,13 @@ fun LoginScreen() {
     val viewModel: LoginViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val qrState by viewModel.qrState.collectAsState()
-    var selectedTab by remember { mutableIntStateOf(0) }
+    val smsState by viewModel.smsState.collectAsState()
+    var selectedTab by remember { mutableIntStateOf(2) }
+
+    LaunchedEffect(selectedTab) {
+        if (selectedTab != 1) viewModel.resetQrState()
+        if (selectedTab != 2) viewModel.resetSmsState()
+    }
 
     Scaffold(topBar = { TopAppBar(title = { Text("登录网易云音乐") }) }) { padding ->
         Column(
@@ -65,13 +71,14 @@ fun LoginScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             TabRow(selectedTabIndex = selectedTab) {
-                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Cookie 登录") })
-                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("二维码登录") })
+                Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Cookie") })
+                Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("二维码") })
+                Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("短信") })
             }
-            if (selectedTab == 0) {
-                CookieLoginPane(viewModel, state)
-            } else {
-                QrLoginPane(qrState) { viewModel.startQrLogin() }
+            when (selectedTab) {
+                0 -> CookieLoginPane(viewModel, state)
+                1 -> QrLoginPane(qrState) { viewModel.startQrLogin() }
+                2 -> SmsLoginPane(viewModel, smsState)
             }
         }
     }
@@ -159,6 +166,81 @@ private fun QrLoginPane(qrState: QrLoginState, onRefresh: () -> Unit) {
 }
 
 @Composable
+private fun SmsLoginPane(viewModel: LoginViewModel, smsState: SmsLoginState) {
+    var phone by remember { mutableStateOf("") }
+    var captcha by remember { mutableStateOf("") }
+    var countdown by remember { mutableIntStateOf(0) }
+    val keyboard = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(smsState) {
+        if (smsState is SmsLoginState.CodeSent) {
+            countdown = 60
+            while (countdown > 0) {
+                delay(1000)
+                countdown--
+            }
+        }
+    }
+
+    Spacer(Modifier.height(8.dp))
+    OutlinedTextField(
+        value = phone,
+        onValueChange = { phone = it.filter(Char::isDigit).take(11) },
+        label = { Text("手机号") },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        OutlinedTextField(
+            value = captcha,
+            onValueChange = { captcha = it.filter(Char::isDigit).take(6) },
+            label = { Text("验证码") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            modifier = Modifier.weight(1f),
+        )
+        OutlinedButton(
+            onClick = { viewModel.sendCaptcha(phone) },
+            enabled = countdown == 0 && smsState !is SmsLoginState.Sending,
+        ) {
+            if (smsState is SmsLoginState.Sending) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            } else if (countdown > 0) {
+                Text("${countdown}s")
+            } else {
+                Text("发送")
+            }
+        }
+    }
+    Button(
+        onClick = {
+            keyboard?.hide()
+            viewModel.loginWithCaptcha(phone, captcha)
+        },
+        enabled = smsState !is SmsLoginState.LoggingIn,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        if (smsState is SmsLoginState.LoggingIn) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                strokeWidth = 2.dp,
+                color = MaterialTheme.colorScheme.onPrimary,
+            )
+        } else {
+            Text("登录")
+        }
+    }
+    (smsState as? SmsLoginState.Error)?.let {
+        Text(it.message, color = MaterialTheme.colorScheme.error)
+    }
+}
+
+@Composable
 private fun QrCodeImage(matrix: BitMatrix) {
     Canvas(modifier = Modifier.size(240.dp)) {
         val cell = size.minDimension / matrix.width
@@ -176,4 +258,3 @@ private fun QrCodeImage(matrix: BitMatrix) {
         }
     }
 }
-

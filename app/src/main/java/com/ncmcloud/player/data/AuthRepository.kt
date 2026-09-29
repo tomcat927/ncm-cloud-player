@@ -1,5 +1,9 @@
 package com.ncmcloud.player.data
 
+import com.ncmcloud.player.core.api.CaptchaSentRequest
+import com.ncmcloud.player.core.api.CaptchaSentResponse
+import com.ncmcloud.player.core.api.LoginCellphoneRequest
+import com.ncmcloud.player.core.api.LoginCellphoneResponse
 import com.ncmcloud.player.core.api.NeteaseApiService
 import com.ncmcloud.player.core.api.QrCheckRequest
 import com.ncmcloud.player.core.api.QrCheckResponse
@@ -22,15 +26,30 @@ class AuthRepository(
         val response = apiService.checkQrStatus(QrCheckRequest(key = key))
         val body = response.body()
             ?: throw IllegalStateException("二维码状态响应为空 httpCode=${response.code()}")
-        val cookies = response.headers().values("Set-Cookie")
-            .map { it.substringBefore(";").trim() }
-            .filter { it.contains("=") }
-            .joinToString("; ")
-            .takeIf { it.isNotEmpty() }
+        val cookies = parseSetCookie(response)
         return body.copy(cookies = cookies)
     }
 
     fun qrLoginUrl(key: String): String = QR_LOGIN_URL_PREFIX + key
+
+    suspend fun sendCaptcha(phone: String, ctcode: String = "86"): CaptchaSentResponse {
+        val resp = apiService.sendCaptcha(CaptchaSentRequest(cellphone = phone, ctcode = ctcode))
+        if (!resp.isSuccess) throw IllegalStateException("验证码发送失败 code=${resp.code}")
+        return resp
+    }
+
+    suspend fun loginWithCaptcha(phone: String, captcha: String, ctcode: String = "86") {
+        val response = apiService.loginCellphone(
+            LoginCellphoneRequest(phone = phone, captcha = captcha, countrycode = ctcode)
+        )
+        val body = response.body()
+            ?: throw IllegalStateException("登录响应为空 httpCode=${response.code()}")
+        if (body.code != 200) throw IllegalStateException("手机登录失败 code=${body.code}")
+        val cookies = parseSetCookie(response)
+            ?: throw IllegalStateException("登录成功但未获取到 Cookie")
+        userPreferences.saveCookies(cookies)
+        fetchAndSaveProfile()
+    }
 
     suspend fun loginWithCookie(rawCookie: String) {
         val cookie = sanitizeCookie(rawCookie)
@@ -64,6 +83,13 @@ class AuthRepository(
             )
         }
     }
+
+    private fun parseSetCookie(response: retrofit2.Response<*>): String? =
+        response.headers().values("Set-Cookie")
+            .map { it.substringBefore(";").trim() }
+            .filter { it.contains("=") }
+            .joinToString("; ")
+            .takeIf { it.contains("MUSIC_U") }
 
     private fun sanitizeCookie(raw: String): String {
         return raw.trim().trim('"').replace("\n", "").replace("\r", "")

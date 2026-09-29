@@ -34,6 +34,18 @@ interface NeteaseApiService {
     suspend fun checkQrStatus(
         @Body body: QrCheckRequest
     ): Response<QrCheckResponse>
+
+    // 发送短信验证码
+    @POST("/api/sms/captcha/sent")
+    suspend fun sendCaptcha(
+        @Body body: CaptchaSentRequest
+    ): CaptchaSentResponse
+
+    // 手机号验证码登录；Cookie 经由 Set-Cookie 响应头下发
+    @POST("/api/w/login/cellphone")
+    suspend fun loginCellphone(
+        @Body body: LoginCellphoneRequest
+    ): Response<LoginCellphoneResponse>
 }
 
 // ======================= 用户账户信息 =======================
@@ -72,7 +84,6 @@ data class LogoutApiResponse(
 
 // ======================= 二维码登录 =======================
 
-// type 固定为 1，网易云 Web/PC 二维码登录标准参数
 @Serializable
 data class QrKeyRequest(val type: Int = 1)
 
@@ -88,8 +99,6 @@ data class QrCheckRequest(
     val type: Int = 1
 )
 
-// code: 800 二维码过期 / 801 等待扫码 / 802 待确认 / 803 授权成功
-// cookies 不是服务端 JSON 字段，由 AuthRepositoryImpl 从 Set-Cookie 响应头解析后回填
 @Serializable
 data class QrCheckResponse(
     val code: Int = 0,
@@ -98,3 +107,36 @@ data class QrCheckResponse(
     val cookies: String? = null
 )
 
+// ======================= 短信验证码登录 =======================
+
+@Serializable
+data class CaptchaSentRequest(
+    val ctcode: String = "86",
+    val secrete: String = "music_middleuser_pclogin",
+    val cellphone: String
+)
+
+@Serializable
+data class CaptchaSentResponse(
+    val code: Int = 0,
+    val description: String? = null
+) {
+    val isSuccess: Boolean get() = code == 200
+}
+
+@Serializable
+data class LoginCellphoneRequest(
+    val type: String = "1",
+    val https: String = "true",
+    val phone: String,
+    val countrycode: String = "86",
+    val captcha: String,
+    val remember: String = "true",
+    val secureCaptcha: String = ""
+)
+
+@Serializable
+data class LoginCellphoneResponse(
+    val code: Int = 0,
+    val profile: UserProfile? = null
+)
