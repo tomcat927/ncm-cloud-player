@@ -35,8 +35,8 @@ interface NeteaseApiService {
         @Body body: QrCheckRequest
     ): Response<QrCheckResponse>
 
-    // 发送短信验证码
-    @POST("/api/sms/captcha/sent")
+        // 发送短信验证码 v1（eapi）
+    @POST("/eapi/middle/captcha/sent/v1")
     suspend fun sendCaptcha(
         @Body body: CaptchaSentRequest
     ): CaptchaSentResponse
@@ -113,7 +113,8 @@ data class QrCheckResponse(
 data class CaptchaSentRequest(
     val ctcode: String = "86",
     val secrete: String = "music_middleuser_pclogin",
-    val cellphone: String
+    val cellphone: String,
+    val scene: String = "0",
 )
 
 @Serializable
@@ -140,3 +141,5 @@ data class LoginCellphoneResponse(
     val code: Int = 0,
     val profile: UserProfile? = null
 )
+
+
