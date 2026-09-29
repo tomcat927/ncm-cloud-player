@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -29,6 +31,8 @@ fun PlayerBar(modifier: Modifier = Modifier) {
     val playerController = remember { GlobalContext.get().get<PlayerController>() }
     val nowPlaying by playerController.nowPlaying.collectAsState()
     val isPlaying by playerController.isPlaying.collectAsState()
+    val canNext by playerController.canSkipNext.collectAsState()
+    val canPrev by playerController.canSkipPrevious.collectAsState()
 
     if (nowPlaying == null) return
 
@@ -45,11 +49,17 @@ fun PlayerBar(modifier: Modifier = Modifier) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            IconButton(onClick = { playerController.skipToPrevious() }, enabled = canPrev) {
+                Icon(Icons.Filled.SkipPrevious, contentDescription = "上一首")
+            }
             IconButton(onClick = { playerController.togglePlay() }) {
                 Icon(
                     if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (isPlaying) "暂停" else "播放",
                 )
+            }
+            IconButton(onClick = { playerController.skipToNext() }, enabled = canNext) {
+                Icon(Icons.Filled.SkipNext, contentDescription = "下一首")
             }
             IconButton(onClick = { playerController.stop() }) {
                 Icon(Icons.Filled.Stop, contentDescription = "停止")

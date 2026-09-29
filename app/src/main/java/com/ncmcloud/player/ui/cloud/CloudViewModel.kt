@@ -50,9 +50,15 @@ class CloudViewModel(
     }
 
     fun play(song: CloudSong) {
+        val index = loaded.indexOfFirst { it.songId == song.songId }
         viewModelScope.launch {
-            runCatching { playerController.play(song) }
-                .onFailure { _state.value = CloudState.Error(it.message ?: "播放失败") }
+            runCatching {
+                if (index >= 0) {
+                    playerController.playQueue(loaded.toList(), index)
+                } else {
+                    playerController.play(song)
+                }
+            }.onFailure { _state.value = CloudState.Error(it.message ?: "播放失败") }
         }
     }
 }

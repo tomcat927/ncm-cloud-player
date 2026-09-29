@@ -70,7 +70,9 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.bouncycastle)
+    implementation(libs.zxing.core)
 
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
+
