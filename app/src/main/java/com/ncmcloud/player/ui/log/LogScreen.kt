@@ -158,6 +158,9 @@ private fun RemoteLogSettingsDialog(
     onDismiss: () -> Unit,
     onSave: (Boolean, String, String, String, String) -> Unit,
 ) {
+    val remoteLogService = remember { GlobalContext.get().get<RemoteLogService>() }
+    val scope = rememberCoroutineScope()
+    var testMessage by remember { mutableStateOf<String?>(null) }
     var enabled by remember { mutableStateOf(initial.enabled) }
     var baseUrl by remember { mutableStateOf(initial.baseUrl) }
     var username by remember { mutableStateOf(initial.username) }
@@ -201,6 +204,22 @@ private fun RemoteLogSettingsDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                TextButton(onClick = {
+                    scope.launch {
+                        testMessage = "测试中…"
+                        testMessage = runCatching {
+                            remoteLogService.testConnection(baseUrl, username, password)
+                            "连接成功"
+                        }.getOrElse { it.message ?: "连接失败" }
+                    }
+                }) { Text("测试连接") }
+                testMessage?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
             }
         },
         confirmButton = {
@@ -211,3 +230,4 @@ private fun RemoteLogSettingsDialog(
         },
     )
 }
+

@@ -90,6 +90,17 @@ class RemoteLogService(
         }
     }
 
+    suspend fun testConnection(baseUrl: String, username: String, password: String): Boolean {
+        val normalizedUrl = normalizeBaseUrl(baseUrl)
+        val savedPassword = dataStore.data.first()[Keys.PASSWORD] ?: ""
+        val effectivePassword = if (password.isNotEmpty()) password else savedPassword
+        if (username.isBlank() || effectivePassword.isEmpty()) {
+            throw IllegalArgumentException("请填写 OpenList 用户名和密码")
+        }
+        login(normalizedUrl, username.trim(), effectivePassword)
+        return true
+    }
+
     suspend fun uploadDiagnosticLog(): RemoteLogUploadResult {
         val config = loadConfig()
         if (!config.isConfigured) throw IllegalStateException("请先配置 OpenList 远程日志")
@@ -249,3 +260,4 @@ class RemoteLogService(
 
     private class AuthException(message: String) : Exception(message)
 }
+
