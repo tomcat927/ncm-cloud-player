@@ -49,10 +49,11 @@ class UpdateService(private val context: Context) {
         val info = checkFromManifest() ?: checkFromGitHubApi()
         if (info == null) {
             AppLogger.i(TAG, "未获取到更新信息")
-            return null
+            null
+        } else {
+            AppLogger.i(TAG, "current=$currentVersionCode latest=${info.versionCode}")
+            if (info.versionCode > currentVersionCode) info else null
         }
-        AppLogger.i(TAG, "current=$currentVersionCode latest=${info.versionCode}")
-        return if (info.versionCode > currentVersionCode) info else null
     }
 
     private fun currentVersionCode(): Long {
@@ -98,7 +99,7 @@ class UpdateService(private val context: Context) {
             else if (name.endsWith(".apk.sha256")) checksumUrl = url
         }
         if (apkUrl.isEmpty()) return null
-        val versionCode = versionCodeFromTag(tagName) ?: return 0L
+        val versionCode = versionCodeFromTag(tagName) ?: return null
         return UpdateInfo(
             tagName = tagName,
             versionCode = versionCode,
@@ -200,4 +201,5 @@ class UpdateService(private val context: Context) {
         return epoch
     }
 }
+
 
