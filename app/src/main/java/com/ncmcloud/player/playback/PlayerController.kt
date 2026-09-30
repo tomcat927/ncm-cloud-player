@@ -2,6 +2,7 @@ package com.ncmcloud.player.playback
 
 import android.content.ComponentName
 import android.content.Context
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
@@ -16,12 +17,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ExecutionException
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val TAG = "PlayerController"
 
@@ -66,11 +71,12 @@ class PlayerController(
     private var currentIndexValue = -1
     private var progressJob: Job? = null
 
-    suspend fun connect() = withContext(Dispatchers.IO) {
+    suspend fun connect() = withContext(Dispatchers.Main) {
         if (controller != null) return@withContext
         val token = SessionToken(context, ComponentName(context, PlaybackService::class.java))
-        controller = MediaController.Builder(context, token).buildAsync().get()
-        controller?.addListener(object : Player.Listener {
+        val built = awaitController(token)
+        controller = built
+        built.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
                 if (isPlaying) startProgressUpdates() else stopProgressUpdates()
@@ -92,8 +98,23 @@ class PlayerController(
                 }
             }
         })
-        _duration.value = controller?.duration?.takeIf { it > 0L } ?: 0L
-        _currentPosition.value = controller?.currentPosition?.coerceAtLeast(0L) ?: 0L
+        _duration.value = built.duration.takeIf { it > 0L } ?: 0L
+        _currentPosition.value = built.currentPosition.coerceAtLeast(0L)
+    }
+
+    private suspend fun awaitController(token: SessionToken): MediaController {
+        val future = MediaController.Builder(context, token).buildAsync()
+        return suspendCancellableCoroutine { cont ->
+            future.addListener({
+                try {
+                    cont.resume(future.get())
+                } catch (e: Throwable) {
+                    val cause = if (e is ExecutionException) e.cause ?: e else e
+                    cont.resumeWithException(cause)
+                }
+            }, ContextCompat.getMainExecutor(context))
+            cont.invokeOnCancellation { future.cancel(true) }
+        }
     }
 
     fun disconnect() {

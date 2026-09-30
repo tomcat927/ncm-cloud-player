@@ -2,6 +2,7 @@ package com.ncmcloud.player.core.log
 
 import android.content.Context
 import android.util.Log
+import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.core.AppEnvironment
 import java.io.File
 import java.io.FileWriter
@@ -14,6 +15,7 @@ object AppLogger {
     private val buffer = ArrayDeque<String>()
     private var logFile: File? = null
     private val dateFormat = SimpleDateFormat("MM-dd HH:mm:ss.SSS", Locale.getDefault())
+    private val versionTag = "v${BuildConfig.VERSION_NAME}(${BuildConfig.VERSION_CODE})"
     private val lock = Any()
 
     fun init(context: Context) {
@@ -30,7 +32,7 @@ object AppLogger {
         if (level == "D" && !AppEnvironment.isDebug) return
         val time = dateFormat.format(Date())
         val text = buildString {
-            append("[$time][$level][$tag] $msg")
+            append("[$time][$level][$tag][$versionTag] $msg")
             if (tr != null) append("\n").append(tr.stackTraceToString())
         }
         if (AppEnvironment.isDebug || level != "D") {
