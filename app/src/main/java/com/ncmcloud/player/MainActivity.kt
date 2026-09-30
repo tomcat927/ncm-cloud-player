@@ -40,10 +40,11 @@ private fun RequestNotificationPermission() {
             AppLogger.i(TAG, "通知权限申请结果: granted=$granted")
         }
 
+        val currentContext = LocalContext.current
         LaunchedEffect(Unit) {
             val permission = Manifest.permission.POST_NOTIFICATIONS
             val granted = ContextCompat.checkSelfPermission(
-                LocalContext.current,
+                currentContext,
                 permission,
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) {
