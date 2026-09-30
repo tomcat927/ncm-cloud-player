@@ -9,6 +9,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,7 +43,6 @@ fun WebViewLoginScreen(
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var extraHeaders by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
-    var fired by remember { mutableStateOf(false) }
 
     val baseUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
 
@@ -68,44 +68,43 @@ fun WebViewLoginScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (extraHeaders.isNotEmpty() || true) {
-                AndroidView(
-                    factory = { context ->
-                        WebView(context).apply {
-                            CookieManager.getInstance().apply {
-                                setAcceptCookie(true)
-                                setAcceptThirdPartyCookies(this@apply, true)
-                                removeAllCookies(null)
-                                flush()
-                            }
-                            setBackgroundColor(android.graphics.Color.parseColor("#F5F5F7"))
-                            webChromeClient = WebChromeClient()
-                            settings.apply {
-                                javaScriptEnabled = true
-                                domStorageEnabled = true
-                                loadWithOverviewMode = true
-                                useWideViewPort = true
-                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                userAgentString = baseUA
-                            }
-                            webViewClient = object : WebViewClient() {
-                                override fun onPageFinished(view: WebView?, url: String?) {
-                                    checkCookies(onLoginSuccess)
-                                    isLoading = false
-                                }
-
-                                override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
-                                    checkCookies(onLoginSuccess)
-                                }
-
-                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
-                            }
-                            loadUrl(NeteaseEndpoints.LOGIN_URL, extraHeaders)
+            AndroidView(
+                factory = { context ->
+                    WebView(context).apply {
+                        val webView = this
+                        CookieManager.getInstance().apply {
+                            setAcceptCookie(true)
+                            setAcceptThirdPartyCookies(webView, true)
+                            removeAllCookies(null)
+                            flush()
                         }
-                    },
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
+                        setBackgroundColor(android.graphics.Color.parseColor("#F5F5F7"))
+                        webChromeClient = WebChromeClient()
+                        settings.apply {
+                            javaScriptEnabled = true
+                            domStorageEnabled = true
+                            loadWithOverviewMode = true
+                            useWideViewPort = true
+                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                            userAgentString = baseUA
+                        }
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                checkCookies(onLoginSuccess)
+                                isLoading = false
+                            }
+
+                            override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                                checkCookies(onLoginSuccess)
+                            }
+
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean = false
+                        }
+                        loadUrl(NeteaseEndpoints.LOGIN_URL, extraHeaders)
+                    }
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             }
