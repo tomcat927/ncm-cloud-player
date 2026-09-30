@@ -13,6 +13,7 @@ import com.ncmcloud.player.playback.PlayerController
 import com.ncmcloud.player.ui.cloud.CloudScreen
 import com.ncmcloud.player.ui.log.LogScreen
 import com.ncmcloud.player.ui.login.LoginScreen
+import com.ncmcloud.player.ui.settings.SettingsScreen
 import com.ncmcloud.player.ui.player.PlayerDetailScreen
 import com.ncmcloud.player.ui.player.PlayerQueueSheet
 import com.ncmcloud.player.ui.update.UpdateDialog
@@ -26,6 +27,7 @@ fun AppRoot() {
     val playerController = remember { GlobalContext.get().get<PlayerController>() }
     val updateViewModel: UpdateViewModel = koinViewModel()
     var showLogs by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var showPlayerDetail by remember { mutableStateOf(false) }
     var showPlayerQueue by remember { mutableStateOf(false) }
 
@@ -49,10 +51,17 @@ fun AppRoot() {
 
     when {
         showLogs -> LogScreen(onBack = { showLogs = false })
+        showSettings -> SettingsScreen(
+            onBack = { showSettings = false },
+            onOpenLogs = {
+                showSettings = false
+                showLogs = true
+            },
+            onCheckUpdate = { updateViewModel.check(manual = true) },
+        )
         cookies.isNullOrBlank() -> LoginScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check(manual = true) })
         else -> CloudScreen(
-            onOpenLogs = { showLogs = true },
-            onCheckUpdate = { updateViewModel.check(manual = true) },
+            onOpenSettings = { showSettings = true },
             onOpenPlayerDetail = { showPlayerDetail = true },
             onOpenPlayerQueue = { showPlayerQueue = true },
         )
