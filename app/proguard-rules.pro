@@ -17,3 +17,10 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# WorkManager / Room（R8 会删掉 WorkDatabase_Impl 构造方法）
+-keep class androidx.work.impl.** { *; }
+-keep class androidx.work.WorkManagerInitializer { *; }
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.room.** { *; }
+-keep class androidx.startup.** { *; }
