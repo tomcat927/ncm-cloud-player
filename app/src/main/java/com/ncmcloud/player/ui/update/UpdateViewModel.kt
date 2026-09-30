@@ -13,6 +13,7 @@ sealed interface UpdateState {
     data object Idle : UpdateState
     data object Checking : UpdateState
     data class Available(val info: UpdateInfo) : UpdateState
+    data object NoUpdate : UpdateState
     data class Downloading(val progress: Float) : UpdateState
     data object Installing : UpdateState
     data class Error(val message: String) : UpdateState
@@ -22,12 +23,18 @@ class UpdateViewModel(private val updateService: UpdateService) : ViewModel() {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
-    fun check() {
+    fun check(manual: Boolean = false) {
         viewModelScope.launch {
             _state.value = UpdateState.Checking
             _state.value = runCatching { updateService.checkForUpdate() }
                 .fold(
-                    onSuccess = { info -> if (info != null) UpdateState.Available(info) else UpdateState.Idle },
+                    onSuccess = { info ->
+                        when {
+                            info != null -> UpdateState.Available(info)
+                            manual -> UpdateState.NoUpdate
+                            else -> UpdateState.Idle
+                        }
+                    },
                     onFailure = { UpdateState.Error(it.message ?: "检查更新失败") },
                 )
         }

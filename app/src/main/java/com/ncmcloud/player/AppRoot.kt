@@ -26,15 +26,17 @@ fun AppRoot() {
 
     LaunchedEffect(Unit) {
         playerController.connect()
-        updateViewModel.check()
+        updateViewModel.check(manual = false)
     }
 
     val cookies by authRepository.cookies.collectAsStateWithLifecycle(initialValue = null)
 
     when {
         showLogs -> LogScreen(onBack = { showLogs = false })
-        cookies.isNullOrBlank() -> LoginScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check() })
-        else -> CloudScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check() })
+        cookies.isNullOrBlank() -> LoginScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check(manual = true) })
+        else -> CloudScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check(manual = true) })
     }
     UpdateDialog()
 }
+
+

@@ -3,7 +3,6 @@ package com.ncmcloud.player.ui.update
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -16,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.ncmcloud.player.BuildConfig
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -28,14 +28,22 @@ fun UpdateDialog() {
             AlertDialog(
                 onDismissRequest = { viewModel.dismiss() },
                 title = { Text("发现新版本 ${s.info.tagName}") },
-                text = {
-                    Text(s.info.releaseNotes ?: "点击更新下载并安装最新版本。")
-                },
+                text = { Text(s.info.releaseNotes ?: "点击更新下载并安装最新版本。") },
                 confirmButton = {
                     TextButton(onClick = { viewModel.download() }) { Text("更新") }
                 },
                 dismissButton = {
                     TextButton(onClick = { viewModel.dismiss() }) { Text("稍后") }
+                },
+            )
+        }
+        is UpdateState.NoUpdate -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismiss() },
+                title = { Text("已是最新版本") },
+                text = { Text("当前版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})，已是最新。") },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismiss() }) { Text("关闭") }
                 },
             )
         }
