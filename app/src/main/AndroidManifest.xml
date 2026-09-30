@@ -50,12 +50,21 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <receiver
+            android:name=".update.UpdateNotificationReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.ncmcloud.player.action.UPDATE_INSTALL_LATER" />
+            </intent-filter>
+        </receiver>
+
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"
             tools:node="merge" />
     </application>
 </manifest>
+
 
 
 

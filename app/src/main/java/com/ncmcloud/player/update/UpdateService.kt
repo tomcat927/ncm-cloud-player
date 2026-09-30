@@ -112,7 +112,7 @@ class UpdateService(private val context: Context) {
         )
     }
 
-    suspend fun downloadAndInstall(info: UpdateInfo, onProgress: suspend (Float) -> Unit = {}) = withContext(Dispatchers.IO) {
+    suspend fun downloadApk(info: UpdateInfo, onProgress: suspend (Float) -> Unit = {}): File = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "apk_updates").apply { mkdirs() }
         val file = File(dir, "ncm-cloud-player-update.apk")
         if (file.exists()) file.delete()
@@ -127,18 +127,17 @@ class UpdateService(private val context: Context) {
                 throw IllegalStateException("SHA-256 校验失败")
             }
         }
-        installApk(file)
+        file
     }
 
-    private fun installApk(file: File) {
+    fun createInstallIntent(file: File): Intent {
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, file)
-        val intent = Intent(Intent.ACTION_VIEW).apply {
+        return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
     }
 
     private suspend fun downloadTo(url: String, target: File, onProgress: suspend (Float) -> Unit): Boolean {
@@ -212,6 +211,7 @@ class UpdateService(private val context: Context) {
         return epoch
     }
 }
+
 
 
 
