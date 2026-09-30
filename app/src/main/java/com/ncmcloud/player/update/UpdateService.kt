@@ -112,7 +112,7 @@ class UpdateService(private val context: Context) {
         )
     }
 
-    suspend fun downloadAndInstall(info: UpdateInfo, onProgress: (Float) -> Unit = {}) = withContext(Dispatchers.IO) {
+    suspend fun downloadAndInstall(info: UpdateInfo, onProgress: suspend (Float) -> Unit = {}) = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "apk_updates").apply { mkdirs() }
         val file = File(dir, "ncm-cloud-player-update.apk")
         if (file.exists()) file.delete()
@@ -141,7 +141,7 @@ class UpdateService(private val context: Context) {
         context.startActivity(intent)
     }
 
-    private fun downloadTo(url: String, target: File, onProgress: (Float) -> Unit): Boolean {
+    private suspend fun downloadTo(url: String, target: File, onProgress: suspend (Float) -> Unit): Boolean {
         return try {
             val request = Request.Builder().url(url).build()
             client.newCall(request).execute().use { response ->
@@ -212,6 +212,7 @@ class UpdateService(private val context: Context) {
         return epoch
     }
 }
+
 
 
 
