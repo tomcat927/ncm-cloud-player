@@ -1,5 +1,6 @@
 package com.ncmcloud.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,6 +13,8 @@ import com.ncmcloud.player.playback.PlayerController
 import com.ncmcloud.player.ui.cloud.CloudScreen
 import com.ncmcloud.player.ui.log.LogScreen
 import com.ncmcloud.player.ui.login.LoginScreen
+import com.ncmcloud.player.ui.player.PlayerDetailScreen
+import com.ncmcloud.player.ui.player.PlayerQueueSheet
 import com.ncmcloud.player.ui.update.UpdateDialog
 import com.ncmcloud.player.ui.update.UpdateViewModel
 import org.koin.androidx.compose.koinViewModel
@@ -23,6 +26,8 @@ fun AppRoot() {
     val playerController = remember { GlobalContext.get().get<PlayerController>() }
     val updateViewModel: UpdateViewModel = koinViewModel()
     var showLogs by remember { mutableStateOf(false) }
+    var showPlayerDetail by remember { mutableStateOf(false) }
+    var showPlayerQueue by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         playerController.connect()
@@ -30,12 +35,44 @@ fun AppRoot() {
     }
 
     val cookies by authRepository.cookies.collectAsStateWithLifecycle(initialValue = null)
+    val nowPlaying by playerController.nowPlaying.collectAsStateWithLifecycle(initialValue = null)
+
+    LaunchedEffect(nowPlaying) {
+        if (nowPlaying == null) {
+            showPlayerDetail = false
+            showPlayerQueue = false
+        }
+    }
+
+    BackHandler(enabled = showPlayerQueue) { showPlayerQueue = false }
+    BackHandler(enabled = showPlayerDetail && !showPlayerQueue) { showPlayerDetail = false }
 
     when {
         showLogs -> LogScreen(onBack = { showLogs = false })
         cookies.isNullOrBlank() -> LoginScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check(manual = true) })
-        else -> CloudScreen(onOpenLogs = { showLogs = true }, onCheckUpdate = { updateViewModel.check(manual = true) })
+        else -> CloudScreen(
+            onOpenLogs = { showLogs = true },
+            onCheckUpdate = { updateViewModel.check(manual = true) },
+            onOpenPlayerDetail = { showPlayerDetail = true },
+            onOpenPlayerQueue = { showPlayerQueue = true },
+        )
     }
+
+    if (showPlayerDetail) {
+        PlayerDetailScreen(
+            playerController = playerController,
+            onClose = { showPlayerDetail = false },
+            onOpenQueue = { showPlayerQueue = true },
+        )
+    }
+
+    if (showPlayerQueue) {
+        PlayerQueueSheet(
+            playerController = playerController,
+            onDismiss = { showPlayerQueue = false },
+        )
+    }
+
     UpdateDialog()
 }
 

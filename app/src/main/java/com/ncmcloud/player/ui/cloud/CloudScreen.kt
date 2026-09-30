@@ -46,7 +46,12 @@ import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CloudScreen(onOpenLogs: () -> Unit, onCheckUpdate: () -> Unit) {
+fun CloudScreen(
+    onOpenLogs: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onOpenPlayerDetail: () -> Unit,
+    onOpenPlayerQueue: () -> Unit,
+) {
     val viewModel: CloudViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     var showSearch by remember { mutableStateOf(false) }
@@ -138,7 +143,11 @@ fun CloudScreen(onOpenLogs: () -> Unit, onCheckUpdate: () -> Unit) {
                     }
                 }
             }
-            PlayerBar(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
+            PlayerBar(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+                onOpenDetail = onOpenPlayerDetail,
+                onOpenQueue = onOpenPlayerQueue,
+            )
         }
     }
 }
