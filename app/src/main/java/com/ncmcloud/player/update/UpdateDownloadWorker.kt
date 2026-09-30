@@ -13,7 +13,10 @@ import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.ncmcloud.player.core.log.AppLogger
 import org.koin.core.context.GlobalContext
+
+private const val TAG = "UpdateDownloadWorker"
 
 class UpdateDownloadWorker(
     appContext: Context,
@@ -36,6 +39,7 @@ class UpdateDownloadWorker(
             releaseUrl = inputData.getString("releaseUrl").orEmpty(),
             releaseNotes = inputData.getString("releaseNotes"),
         )
+        AppLogger.i(TAG, "开始更新下载: tag=${info.tagName}, versionCode=${info.versionCode}")
         setForeground(createProgressForegroundInfo(-1f))
         val updateService = GlobalContext.get().get<UpdateService>()
         return try {
@@ -43,9 +47,16 @@ class UpdateDownloadWorker(
                 runCatching { setProgress(workDataOf("progress" to progress)) }
                 runCatching { setForeground(createProgressForegroundInfo(progress)) }
             }
+            AppLogger.i(TAG, "更新下载完成: tag=${info.tagName}, file=${file.absolutePath}, size=${file.length()}")
             showCompleteNotification(file, info.tagName)
-            Result.success()
+            Result.success(
+                workDataOf(
+                    "apkPath" to file.absolutePath,
+                    "tagName" to info.tagName,
+                ),
+            )
         } catch (e: Exception) {
+            AppLogger.e(TAG, "更新下载失败: tag=${info.tagName}", e)
             Result.failure(workDataOf("error" to (e.message ?: "下载或安装失败")))
         }
     }
@@ -53,6 +64,8 @@ class UpdateDownloadWorker(
     private fun showCompleteNotification(file: java.io.File, tagName: String) {
         val context = applicationContext
         ensureChannel(completeChannelId, "更新下载完成", NotificationManager.IMPORTANCE_HIGH)
+        val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        AppLogger.i(TAG, "准备显示完成通知: enabled=$notificationsEnabled, id=$completeNotificationId")
         val installIntent = GlobalContext.get().get<UpdateService>().createInstallIntent(file)
         val installPending = PendingIntent.getActivity(
             context,
@@ -77,7 +90,13 @@ class UpdateDownloadWorker(
             .setContentIntent(installPending)
             .addAction(0, "稍后安装", laterPending)
             .build()
-        NotificationManagerCompat.from(context).notify(completeNotificationId, notification)
+        runCatching {
+            NotificationManagerCompat.from(context).notify(completeNotificationId, notification)
+        }.onSuccess {
+            AppLogger.i(TAG, "完成通知已提交")
+        }.onFailure {
+            AppLogger.e(TAG, "完成通知提交失败", it)
+        }
     }
 
     private fun createProgressForegroundInfo(progress: Float): ForegroundInfo {
@@ -104,6 +123,7 @@ class UpdateDownloadWorker(
         val manager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager.getNotificationChannel(id) == null) {
             manager.createNotificationChannel(NotificationChannel(id, name, importance))
+            AppLogger.i(TAG, "已创建通知渠道: $id")
         }
     }
 }

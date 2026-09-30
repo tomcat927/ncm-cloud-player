@@ -113,6 +113,7 @@ class UpdateService(private val context: Context) {
     }
 
     suspend fun downloadApk(info: UpdateInfo, onProgress: suspend (Float) -> Unit = {}): File = withContext(Dispatchers.IO) {
+        AppLogger.i(TAG, "开始下载 APK: ${info.tagName}, primary=${info.downloadUrl}, fallback=${info.fallbackDownloadUrl}")
         val dir = File(context.cacheDir, "apk_updates").apply { mkdirs() }
         val file = File(dir, "ncm-cloud-player-update.apk")
         if (file.exists()) file.delete()
@@ -121,11 +122,15 @@ class UpdateService(private val context: Context) {
             ?: throw IllegalStateException("APK 下载失败")
 
         val expected = readChecksum(info.checksumUrl) ?: readChecksum(info.fallbackChecksumUrl)
+        AppLogger.i(TAG, "APK 下载结束: file=${file.absolutePath}, size=${file.length()}, checksumUrl=${info.checksumUrl}")
         if (expected != null) {
             val actual = sha256(file)
+            AppLogger.i(TAG, "APK SHA-256: expected=$expected, actual=$actual")
             if (!actual.equals(expected, ignoreCase = true)) {
                 throw IllegalStateException("SHA-256 校验失败")
             }
+        } else {
+            AppLogger.w(TAG, "未获取到 SHA-256 校验值，跳过校验")
         }
         file
     }
@@ -133,6 +138,7 @@ class UpdateService(private val context: Context) {
     fun createInstallIntent(file: File): Intent {
         val authority = "${context.packageName}.fileprovider"
         val uri = FileProvider.getUriForFile(context, authority, file)
+        AppLogger.i(TAG, "创建安装 Intent: file=${file.absolutePath}, size=${file.length()}, uri=$uri")
         return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -144,7 +150,11 @@ class UpdateService(private val context: Context) {
         return try {
             val request = Request.Builder().url(url).build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) return false
+                AppLogger.i(TAG, "下载响应: code=${response.code}, url=$url, contentLength=${response.body?.contentLength() ?: -1}")
+                if (!response.isSuccessful) {
+                    AppLogger.w(TAG, "下载响应失败: code=${response.code}, url=$url")
+                    return false
+                }
                 val body = response.body ?: return false
                 val total = body.contentLength()
                 val input = body.byteStream()
@@ -160,7 +170,9 @@ class UpdateService(private val context: Context) {
                     }
                 }
             }
-            target.exists() && target.length() > 0
+            val exists = target.exists() && target.length() > 0
+            AppLogger.i(TAG, "下载写入完成: url=$url, file=${target.absolutePath}, size=${target.length()}, ok=$exists")
+            exists
         } catch (e: Exception) {
             AppLogger.e(TAG, "下载失败: $url", e)
             false
@@ -182,7 +194,10 @@ class UpdateService(private val context: Context) {
     }
 
     private suspend fun readChecksum(url: String): String? {
-        val text = readText(url) ?: return null
+        val text = readText(url) ?: run {
+            AppLogger.w(TAG, "校验文件下载失败: $url")
+            return null
+        }
         val value = text.trim().split(Regex("\\s+")).firstOrNull()
         return value?.takeIf { it.length == 64 }
     }
