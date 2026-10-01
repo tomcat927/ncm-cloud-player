@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
@@ -103,10 +102,28 @@ fun PlayerDetailScreen(
         0f
     }
 
+    // 与 skipToNext/skipToPrevious 的绕圈规则保持一致：顺序播放到边界不绕圈，其余模式绕圈
+    val loopWraps = playMode != PlayMode.ORDER
+    val previousSong = when {
+        queue.isEmpty() -> null
+        currentIndex > 0 -> queue[currentIndex - 1]
+        loopWraps -> queue.last()
+        else -> null
+    }
+    val nextSong = when {
+        queue.isEmpty() -> null
+        currentIndex < queue.lastIndex -> queue[currentIndex + 1]
+        loopWraps -> queue.first()
+        else -> null
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DetailBackdrop),
+            .background(DetailBackdrop)
+            // 详情页是叠在云盘列表上层的浮层，background 不拦截点击；
+            // 不消费的话点空白处会穿透到下层列表误触切歌
+            .pointerInput(Unit) { detectTapGestures { } },
     ) {
         if (song.albumPicUrl.isNotBlank()) {
             AsyncImage(
@@ -178,30 +195,17 @@ fun PlayerDetailScreen(
 
             Spacer(modifier = Modifier.height(34.dp))
 
-            Box(
+            SwipeToSkipCover(
+                currentSong = song,
+                previousSong = previousSong,
+                nextSong = nextSong,
+                onConfirmPrevious = { playerController.skipToPrevious() },
+                onConfirmNext = { playerController.skipToNext() },
+                shape = RoundedCornerShape(24.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White.copy(alpha = 0.08f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (song.albumPicUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = song.albumPicUrl,
-                        contentDescription = song.displayTitle,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    Icon(
-                        Icons.Filled.MusicNote,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.72f),
-                        modifier = Modifier.size(62.dp),
-                    )
-                }
-            }
+                    .aspectRatio(1f),
+            )
 
             Spacer(modifier = Modifier.height(30.dp))
 
