@@ -28,7 +28,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -217,9 +216,15 @@ private fun KaraokeLineText(
 ) {
     var animatedPosition by remember { mutableLongStateOf(line.timeMs) }
     LaunchedEffect(isPlaying, line) {
+        // 30Hz 已足够逐字填色的平滑度；60fps 帧循环会在低端机上打满主线程，
+        // 导致返回键/点击等输入事件排队延迟。暂停时填色冻结在原地，循环直接停止。
+        if (!isPlaying) {
+            animatedPosition = positionProvider()
+            return@LaunchedEffect
+        }
         while (isActive) {
             animatedPosition = positionProvider()
-            withFrameNanos { }
+            delay(33)
         }
     }
     val styled = buildAnnotatedString {

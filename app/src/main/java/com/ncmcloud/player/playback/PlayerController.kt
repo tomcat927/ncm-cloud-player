@@ -98,7 +98,8 @@ class PlayerController(
     private var lastKnownPositionAt = 0L
 
     fun setLyricsVisible(visible: Boolean) {
-        progressIntervalMs = if (visible) 50L else 500L
+        // 100ms 轮询足够行级同步；逐字填色由 estimatedPositionMs 自行外推，不依赖轮询密度
+        progressIntervalMs = if (visible) 100L else 500L
     }
 
     // 轮询间隙内按播放时长外推当前位置，卡拉OK逐字进度才能平滑
