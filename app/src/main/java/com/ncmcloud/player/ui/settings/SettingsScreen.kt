@@ -1,5 +1,6 @@
 package com.ncmcloud.player.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -73,6 +74,9 @@ fun SettingsScreen(
 ) {
     val viewModel: CloudViewModel = koinViewModel()
     var showLogoutDialog by remember { mutableStateOf(false) }
+
+    // 系统返回键回到云盘列表，而不是退出应用
+    BackHandler { onBack() }
 
     val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
     val scope = rememberCoroutineScope()

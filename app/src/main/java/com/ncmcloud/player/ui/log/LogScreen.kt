@@ -1,6 +1,7 @@
 package com.ncmcloud.player.ui.log
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -54,6 +55,9 @@ fun LogScreen(onBack: () -> Unit) {
     var message by remember { mutableStateOf<String?>(null) }
     var showSettings by remember { mutableStateOf(false) }
     var config by remember { mutableStateOf(RemoteLogConfig(false, "", "", "/ncm-cloud-player/logs", null, null)) }
+
+    // 系统返回键回到上一页，而不是退出应用
+    BackHandler { onBack() }
 
     LaunchedEffect(Unit) {
         config = runCatching { remoteLogService.loadConfig() }.getOrDefault(config)

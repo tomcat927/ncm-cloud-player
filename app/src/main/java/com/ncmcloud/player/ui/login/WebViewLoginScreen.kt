@@ -7,6 +7,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -43,6 +44,17 @@ fun WebViewLoginScreen(
 ) {
     var isLoading by remember { mutableStateOf(true) }
     var extraHeaders by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    // 系统返回键：网页能后退就后退，到首页才关闭登录页
+    BackHandler {
+        val webView = webViewRef
+        if (webView != null && webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            onClose()
+        }
+    }
 
     val baseUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Mobile Safari/537.36"
 
@@ -72,6 +84,7 @@ fun WebViewLoginScreen(
                 factory = { context ->
                     WebView(context).apply {
                         val webView = this
+                        webViewRef = this
                         CookieManager.getInstance().apply {
                             setAcceptCookie(true)
                             setAcceptThirdPartyCookies(webView, true)
