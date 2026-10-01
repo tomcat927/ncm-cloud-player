@@ -133,6 +133,7 @@ class PlayerController(
         controller = built
         built.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                AppLogger.i(TAG, "isPlaying=$isPlaying")
                 _isPlaying.value = isPlaying
                 if (isPlaying) startProgressUpdates() else stopProgressUpdates()
             }

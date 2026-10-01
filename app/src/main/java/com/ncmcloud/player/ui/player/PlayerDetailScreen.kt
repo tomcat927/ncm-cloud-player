@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.domain.PlayMode
+import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.playback.PlayerController
 import org.koin.core.context.GlobalContext
@@ -130,7 +131,16 @@ fun PlayerDetailScreen(
     }
 
     // 返回手势优先关闭歌词页，再关闭播放详情页
-    BackHandler(enabled = showLyrics) { showLyrics = false }
+    BackHandler(enabled = showLyrics) {
+        AppLogger.i("Nav", "返回键：关闭歌词页")
+        showLyrics = false
+    }
+
+    // 临时埋点：定位详情页返回耗时分布
+    DisposableEffect(Unit) {
+        AppLogger.i("Nav", "详情页进入组合")
+        onDispose { AppLogger.i("Nav", "详情页离开组合") }
+    }
 
     // 歌词可见时加密位置轮询到 50ms，离开或关闭时恢复
     DisposableEffect(showLyrics) {
@@ -201,7 +211,10 @@ fun PlayerDetailScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                DetailIconButton(onClick = onClose) {
+                DetailIconButton(onClick = {
+                    AppLogger.i("Nav", "收起按钮点击")
+                    onClose()
+                }) {
                     Icon(
                         Icons.Filled.KeyboardArrowDown,
                         contentDescription = "收起播放页",

@@ -47,7 +47,10 @@ fun AppRoot() {
     }
 
     BackHandler(enabled = showPlayerQueue) { showPlayerQueue = false }
-    BackHandler(enabled = showPlayerDetail && !showPlayerQueue) { showPlayerDetail = false }
+    BackHandler(enabled = showPlayerDetail && !showPlayerQueue) {
+        AppLogger.i("Nav", "返回键：关闭播放详情页")
+        showPlayerDetail = false
+    }
 
     when {
         showLogs -> LogScreen(onBack = { showLogs = false })
