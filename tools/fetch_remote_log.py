@@ -104,6 +104,8 @@ def download_text(raw_url):
 
 
 def collect_files(base, token, target_path):
+    """返回 [(相对 target_path 的路径, 条目)]；子目录里的文件路径必须带目录前缀，
+    否则 /api/fs/get 会报 object not found。"""
     entries = list_dir(base, token, target_path)
     files = []
     for entry in entries:
@@ -111,10 +113,10 @@ def collect_files(base, token, target_path):
             sub = list_dir(base, token, f"{target_path}/{entry['name']}")
             for f in sub:
                 if not f.get("is_dir"):
-                    files.append(f)
+                    files.append((f"{entry['name']}/{f['name']}", f))
         else:
-            files.append(entry)
-    files.sort(key=lambda f: f.get("modified", ""), reverse=True)
+            files.append((entry["name"], entry))
+    files.sort(key=lambda item: item[1].get("modified", ""), reverse=True)
     return files
 
 
@@ -132,16 +134,16 @@ def main():
         sys.exit("远程日志目录为空")
 
     if args.list:
-        for f in files[:20]:
-            print(f"{f['modified']}  {f.get('size',0):>8}  {f['name']}")
+        for rel, f in files[:20]:
+            print(f"{f['modified']}  {f.get('size',0):>8}  {rel}")
         return
 
-    files = files if args.all else files[:1]
-    for f in files:
-        file_path = f"{cfg['target_path']}/{f['name']}"
+    selected = files if args.all else files[:1]
+    for rel, f in selected:
+        file_path = f"{cfg['target_path']}/{rel}"
         info = post_json(base, "/api/fs/get", {"path": file_path}, token)
         raw_url = fix_raw_url(base, (info.get("data") or {}).get("raw_url", ""))
-        print(f"===== {f['name']} ({f.get('size')} bytes) =====")
+        print(f"===== {rel} ({f.get('size')} bytes) =====")
         if raw_url:
             print(download_text(raw_url))
         else:
