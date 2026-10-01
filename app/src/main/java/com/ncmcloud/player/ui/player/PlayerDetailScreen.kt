@@ -108,7 +108,9 @@ fun PlayerDetailScreen(
 
     // 歌词偏好（字号/翻译开关）从设置页读取
     val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
-    val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(initial = 20)
+    val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(
+        initial = SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
+    )
     val lyricShowTranslation by settingsPreferences.lyricTranslationEnabled.collectAsState(initial = true)
 
     // 模式切换反馈：页面内浮动标签，连点时立即换文案并重置停留计时（不受系统 Toast 排队影响）

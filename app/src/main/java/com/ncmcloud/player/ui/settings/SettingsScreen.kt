@@ -146,6 +146,12 @@ fun SettingsScreen(
                         value = lyricFontSize.toFloat(),
                         valueRange = 16f..26f,
                         steps = 4,
+                        showReset = lyricFontSize != SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
+                        onReset = {
+                            scope.launch {
+                                settingsPreferences.setLyricFontSize(SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE)
+                            }
+                        },
                         onFinished = { scope.launch { settingsPreferences.setLyricFontSize(it) } },
                     )
                 }
@@ -364,6 +370,8 @@ private fun SettingsSliderRow(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
+    showReset: Boolean,
+    onReset: () -> Unit,
     onFinished: (Int) -> Unit,
 ) {
     // 拖动过程只更新本地值，松手才落盘，避免 DataStore 被连续写入
@@ -380,13 +388,27 @@ private fun SettingsSliderRow(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(title, fontSize = 15.sp)
-                Text(
-                    valueText,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text(
+                        valueText,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (showReset) {
+                        Text(
+                            "恢复默认",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable(onClick = onReset),
+                        )
+                    }
+                }
             }
             Slider(
                 value = sliderValue,

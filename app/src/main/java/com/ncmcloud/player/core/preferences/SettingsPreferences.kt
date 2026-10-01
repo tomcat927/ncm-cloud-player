@@ -19,6 +19,8 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LYRIC_CACHE = booleanPreferencesKey("lyric_cache_enabled")
         private val KEY_LYRIC_TRANSLATION = booleanPreferencesKey("lyric_translation_enabled")
         private val KEY_LYRIC_FONT_SIZE = intPreferencesKey("lyric_font_size")
+
+        const val DEFAULT_LYRIC_FONT_SIZE = 20
     }
 
     val useRealIp: Flow<Boolean> = dataStore.data.map { it[KEY_USE_REAL_IP] ?: true }
@@ -29,7 +31,7 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
     val lyricCacheEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LYRIC_CACHE] ?: true }
     val lyricTranslationEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LYRIC_TRANSLATION] ?: true }
     // 歌词当前行字号（sp），其余行按固定差值缩小
-    val lyricFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRIC_FONT_SIZE] ?: 20 }
+    val lyricFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRIC_FONT_SIZE] ?: DEFAULT_LYRIC_FONT_SIZE }
 
     suspend fun setUseRealIp(value: Boolean) {
         dataStore.edit { it[KEY_USE_REAL_IP] = value }
