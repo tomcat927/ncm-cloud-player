@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -28,6 +29,21 @@ class MainActivity : ComponentActivity() {
                 AppRoot()
             }
         }
+    }
+
+    // 临时埋点：记录系统返回键到达 App 的时刻，与 Compose 处理时刻对比可区分
+    // "按键派发延迟"和"App 内处理延迟"
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            AppLogger.i(TAG, "返回键到达 Activity")
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    // 临时埋点：窗口失焦会导致按键/点击表现为"没反应"
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        AppLogger.i(TAG, "窗口焦点: hasFocus=$hasFocus")
     }
 }
 

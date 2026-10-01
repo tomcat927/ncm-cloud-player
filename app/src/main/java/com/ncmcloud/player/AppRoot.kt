@@ -20,6 +20,7 @@ import com.ncmcloud.player.ui.player.PlayerDetailScreen
 import com.ncmcloud.player.ui.player.PlayerQueueSheet
 import com.ncmcloud.player.ui.update.UpdateDialog
 import com.ncmcloud.player.ui.update.UpdateViewModel
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.context.GlobalContext
 
@@ -78,6 +79,14 @@ fun AppRoot() {
             onOpenPlayerDetail = { showPlayerDetail = true },
             onOpenPlayerQueue = { showPlayerQueue = true },
         )
+    }
+
+    // 临时埋点：主线程心跳，若时间戳出现大间隔说明主线程被阻塞
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000)
+            AppLogger.i("Nav", "主线程心跳")
+        }
     }
 
     if (showPlayerDetail) {
