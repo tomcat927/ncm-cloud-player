@@ -78,7 +78,9 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val lyricCacheEnabled by settingsPreferences.lyricCacheEnabled.collectAsState(initial = true)
     val lyricTranslationEnabled by settingsPreferences.lyricTranslationEnabled.collectAsState(initial = true)
-    val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(initial = 20)
+    val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(
+        initial = SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
+    )
 
     Scaffold(
         topBar = {
