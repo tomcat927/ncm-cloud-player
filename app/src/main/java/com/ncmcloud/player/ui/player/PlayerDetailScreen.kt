@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
@@ -88,6 +89,7 @@ fun PlayerDetailScreen(
 
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
+    var showSongInfo by remember { mutableStateOf(false) }
 
     val song = nowPlaying?.song ?: return
 
@@ -180,6 +182,15 @@ fun PlayerDetailScreen(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
+                    )
+                }
+
+                DetailIconButton(onClick = { showSongInfo = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = "歌曲信息",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp),
                     )
                 }
 
@@ -357,6 +368,13 @@ fun PlayerDetailScreen(
                 Spacer(modifier = Modifier.width(44.dp))
             }
         }
+
+        if (showSongInfo) {
+            SongInfoSheet(
+                playerController = playerController,
+                onDismiss = { showSongInfo = false },
+            )
+        }
     }
 }
 
@@ -461,7 +479,8 @@ private fun DetailProgressSection(
     }
 }
 
-private fun formatDuration(timeMs: Long): String {
+// SongInfoSheet 同包复用
+internal fun formatDuration(timeMs: Long): String {
     if (timeMs <= 0L) return "00:00"
     val totalSeconds = timeMs / 1000
     val minutes = totalSeconds / 60
@@ -469,7 +488,7 @@ private fun formatDuration(timeMs: Long): String {
     return String.format(Locale.US, "%02d:%02d", minutes, seconds)
 }
 
-private fun formatFileSize(sizeBytes: Long): String {
+internal fun formatFileSize(sizeBytes: Long): String {
     if (sizeBytes <= 0L) return "未知大小"
     val megabytes = sizeBytes / 1024f / 1024f
     return if (megabytes >= 1f) {
