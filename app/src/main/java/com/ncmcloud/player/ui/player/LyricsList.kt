@@ -212,17 +212,22 @@ private fun LyricLineRow(
     }
 }
 
-// 弹簧逐帧滚动到目标位移（目标 = 当前行中心与视口中心的差值）
+// 弹簧逐帧滚动到目标位移（目标 = 当前行中心与视口中心的差值）。
+// 必须包在 LazyListState.scroll {} 里：滚动作用域的 scrollBy 是非挂起成员，
+// 才能在 animateTo 的逐帧回调里调用（模式抄自 Melodia springScrollToCentre）
 private suspend fun springScrollBy(state: LazyListState, deltaPx: Float) {
     var last = 0f
-    Animatable(0f).animateTo(
-        deltaPx,
-        spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow,
-        ),
-    ) { value, _ ->
-        state.scrollBy(value - last)
-        last = value
+    state.scroll {
+        Animatable(0f).animateTo(
+            deltaPx,
+            spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        ) {
+            val delta = value - last
+            scrollBy(delta)
+            last = value
+        }
     }
 }
