@@ -35,6 +35,10 @@ private const val TAG = "PlayerController"
 data class NowPlaying(
     val song: CloudSong,
     val url: String,
+    // 本次取址服务端实际返回的码率/格式/大小，用于与云盘元数据对比确认音质档位是否生效
+    val actualBitrate: Long = 0,
+    val actualType: String? = null,
+    val actualSize: Long = 0,
 )
 
 class PlayerController(
@@ -236,10 +240,12 @@ class PlayerController(
         if (currentIndexValue < 0 || currentIndexValue >= queueList.size) return
         val song = queueList[currentIndexValue]
         val level = settingsPreferences.playQuality.first()
-        val url = runCatching { playbackRepository.getSongUrl(song.songId, level) }
+        val stream = runCatching { playbackRepository.getSongStream(song.songId, level) }
             .onFailure { AppLogger.e(TAG, "获取播放地址失败: ${song.songId}", it) }
             .getOrNull()
             ?: throw IllegalStateException("获取播放地址失败")
+        val url = stream.url ?: throw IllegalStateException("获取播放地址失败")
+        AppLogger.i(TAG, "取址完成 level=$level br=${stream.br} type=${stream.type} size=${stream.size}")
         val metadata = MediaMetadata.Builder()
             .setTitle(song.displayTitle)
             .setArtist(song.displayArtist)
@@ -257,7 +263,13 @@ class PlayerController(
         player?.setMediaItem(item)
         player?.prepare()
         player?.play()
-        _nowPlaying.value = NowPlaying(song, url)
+        _nowPlaying.value = NowPlaying(
+            song = song,
+            url = url,
+            actualBitrate = stream.br,
+            actualType = stream.type,
+            actualSize = stream.size,
+        )
         _currentPosition.value = 0L
         _duration.value = 0L
         updateSkipFlags()

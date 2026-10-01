@@ -31,6 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ncmcloud.player.core.preferences.SettingsPreferences
+import com.ncmcloud.player.playback.NowPlaying
 import com.ncmcloud.player.playback.PlayerController
 import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
@@ -59,7 +60,8 @@ fun SongInfoSheet(
     playerController: PlayerController,
     onDismiss: () -> Unit,
 ) {
-    val song = playerController.nowPlaying.collectAsState().value?.song ?: return
+    val nowPlaying = playerController.nowPlaying.collectAsState().value ?: return
+    val song = nowPlaying.song
     val duration by playerController.duration.collectAsState()
     val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
     val playQuality by settingsPreferences.playQuality.collectAsState(initial = "exhigh")
@@ -84,8 +86,14 @@ fun SongInfoSheet(
             InfoRow("专辑", song.album.ifBlank { "未知专辑" })
             InfoRow("格式", formatLabel(song.fileName))
             InfoRow("时长", formatDuration(duration))
-            InfoRow("大小", formatFileSize(song.fileSize))
-            InfoRow("码率", if (song.bitrate > 0) "${song.bitrate / 1000} kbps" else "未知")
+            InfoRow("文件码率", if (song.bitrate > 0) "${song.bitrate / 1000} kbps" else "未知")
+            InfoRow("文件大小", formatFileSize(song.fileSize))
+            InfoRow("实际下发", actualStreamLabel(nowPlaying))
+            Text(
+                "实际下发 = 本次取址服务端返回的码率与格式，与文件码率对比可确认音质档位是否生效",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             InfoRow("加入云盘", formatDate(song.addTime))
             InfoRow("匹配状态", matchLabel(song.matchType))
 
@@ -149,6 +157,13 @@ private fun InfoRow(label: String, value: String) {
 
 private fun formatLabel(fileName: String): String =
     fileName.substringAfterLast('.', "").takeIf { it.isNotBlank() }?.uppercase() ?: "未知"
+
+// 服务端本次实际返回的码率/格式/大小，任一缺失就跳过，全缺则显示未知
+private fun actualStreamLabel(nowPlaying: NowPlaying): String = buildList {
+    nowPlaying.actualBitrate.takeIf { it > 0 }?.let { add("${it / 1000} kbps") }
+    nowPlaying.actualType?.takeIf { it.isNotBlank() }?.let { add(it.uppercase()) }
+    nowPlaying.actualSize.takeIf { it > 0 }?.let { add(formatFileSize(it)) }
+}.joinToString(" · ").ifBlank { "未知" }
 
 private fun formatDate(timeMs: Long): String =
     if (timeMs <= 0L) {
