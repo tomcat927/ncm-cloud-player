@@ -49,10 +49,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.ncmcloud.player.data.CloudDiskSummary
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.ui.player.PlayerBar
 import org.koin.androidx.compose.koinViewModel
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +66,7 @@ fun CloudScreen(
 ) {
     val viewModel: CloudViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
+    val diskSummary by viewModel.diskSummary.collectAsState()
     var query by remember { mutableStateOf("") }
 
     Scaffold(
@@ -162,6 +166,12 @@ fun CloudScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentPadding = PaddingValues(bottom = 108.dp),
                             ) {
+                                val summary = diskSummary
+                                if (summary != null && summary.totalBytes > 0) {
+                                    item(key = "disk-summary") {
+                                        DiskSummaryRow(summary)
+                                    }
+                                }
                                 items(filtered, key = { it.songId }) { song ->
                                     CloudSongRow(
                                         song = song,
@@ -194,6 +204,66 @@ fun CloudScreen(
                 onOpenQueue = onOpenPlayerQueue,
             )
         }
+    }
+}
+
+@Composable
+private fun DiskSummaryRow(summary: CloudDiskSummary) {
+    val ratio = if (summary.totalBytes > 0) {
+        (summary.usedBytes.toFloat() / summary.totalBytes).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    // 占用超九成变警示色，提示该清理云盘了
+    val barColor = if (ratio > 0.9f) {
+        MaterialTheme.colorScheme.error
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                "共 ${summary.songCount} 首",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                "云盘 ${formatGb(summary.usedBytes)} / ${formatGb(summary.totalBytes)}",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(ratio)
+                    .height(2.dp)
+                    .background(barColor),
+            )
+        }
+    }
+}
+
+private fun formatGb(bytes: Long): String {
+    val gb = bytes / 1024.0 / 1024.0 / 1024.0
+    return if (gb >= 1.0) {
+        String.format(Locale.US, "%.1f GB", gb)
+    } else {
+        String.format(Locale.US, "%.0f MB", gb * 1024)
     }
 }
 

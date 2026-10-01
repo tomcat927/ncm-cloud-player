@@ -5,11 +5,23 @@ import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.feature.cloud.data.CloudApi
 import com.ncmcloud.player.feature.cloud.data.CloudListRequest
 
+// 云盘概览：count/size/maxSize 由列表接口随每页返回，是全盘值（不随分页变化）
+data class CloudDiskSummary(
+    val songCount: Int,
+    val usedBytes: Long,
+    val totalBytes: Long,
+)
+
+data class CloudPage(
+    val songs: List<CloudSong>,
+    val summary: CloudDiskSummary,
+)
+
 class CloudRepository(private val cloudApi: CloudApi) {
-    suspend fun getCloudSongs(limit: Int = 100, offset: Int = 0): List<CloudSong> {
+    suspend fun getCloudSongs(limit: Int = 100, offset: Int = 0): CloudPage {
         val resp = cloudApi.getCloudSongs(CloudListRequest(limit = limit, offset = offset))
         if (!resp.isSuccess) throw IllegalStateException("云盘接口返回 code=${resp.code}")
-        return resp.data.map { item ->
+        val songs = resp.data.map { item ->
             val artists = item.simpleSong.ar
             val album: Album = item.simpleSong.al
             val artistName = item.artist.ifBlank { artists.joinToString("/") { it.name } }
@@ -27,5 +39,13 @@ class CloudRepository(private val cloudApi: CloudApi) {
                 albumPicUrl = album.picUrl,
             )
         }
+        return CloudPage(
+            songs = songs,
+            summary = CloudDiskSummary(
+                songCount = resp.count,
+                usedBytes = resp.size,
+                totalBytes = resp.maxSize,
+            ),
+        )
     }
 }

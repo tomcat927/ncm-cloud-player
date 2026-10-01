@@ -3,6 +3,7 @@ package com.ncmcloud.player.ui.cloud
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ncmcloud.player.data.AuthRepository
+import com.ncmcloud.player.data.CloudDiskSummary
 import com.ncmcloud.player.data.CloudRepository
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.playback.PlayerController
@@ -25,6 +26,9 @@ class CloudViewModel(
     private val _state = MutableStateFlow<CloudState>(CloudState.Loading)
     val state: StateFlow<CloudState> = _state.asStateFlow()
 
+    private val _diskSummary = MutableStateFlow<CloudDiskSummary?>(null)
+    val diskSummary: StateFlow<CloudDiskSummary?> = _diskSummary.asStateFlow()
+
     private var offset = 0
     private val loaded = mutableListOf<CloudSong>()
 
@@ -41,9 +45,10 @@ class CloudViewModel(
             _state.value = CloudState.Loading
             _state.value = runCatching { cloudRepository.getCloudSongs(limit = 100, offset = offset) }
                 .fold(
-                    onSuccess = { songs ->
-                        loaded.addAll(songs)
-                        offset += songs.size
+                    onSuccess = { page ->
+                        loaded.addAll(page.songs)
+                        offset += page.songs.size
+                        _diskSummary.value = page.summary
                         CloudState.Content(loaded.toList())
                     },
                     onFailure = { CloudState.Error(it.message ?: "加载云盘失败") },
