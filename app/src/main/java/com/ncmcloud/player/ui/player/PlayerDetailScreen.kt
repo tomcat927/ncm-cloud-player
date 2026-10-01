@@ -2,11 +2,11 @@ package com.ncmcloud.player.ui.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -67,7 +67,6 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.domain.PlayMode
 import com.ncmcloud.player.core.preferences.SettingsPreferences
-import com.ncmcloud.player.playback.LyricLine
 import com.ncmcloud.player.playback.PlayerController
 import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.delay
@@ -251,7 +250,32 @@ fun PlayerDetailScreen(
                     .weight(1f)
                     .fillMaxWidth(),
             ) {
-                Column(modifier = Modifier.fillMaxWidth()) {
+                // 网易云官方式原地切换：封面态与歌词态共用页面背景与底部控件，
+                // 中间区域原地交叉淡入淡出，不再是压暗浮层
+                Crossfade(
+                    targetState = showLyrics,
+                    animationSpec = tween(durationMillis = 300),
+                    label = "detailMiddle",
+                ) { lyricsVisible ->
+                    if (lyricsVisible) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) { detectTapGestures { showLyrics = false } },
+                        ) {
+                            LyricsList(
+                                lines = lyrics,
+                                currentIndex = currentLyricIndex,
+                                positionProvider = { playerController.estimatedPositionMs() },
+                                isPlaying = isPlaying,
+                                fontSize = lyricFontSize,
+                                showTranslation = lyricShowTranslation,
+                                onSeek = { playerController.seekTo(it) },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                    } else {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.height(34.dp))
 
                     SwipeToSkipCover(
@@ -309,20 +333,8 @@ fun PlayerDetailScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                    }
                 }
-
-                LyricsOverlay(
-                    visible = showLyrics,
-                    lines = lyrics,
-                    currentIndex = currentLyricIndex,
-                    positionProvider = { playerController.estimatedPositionMs() },
-                    isPlaying = isPlaying,
-                    fontSize = lyricFontSize,
-                    showTranslation = lyricShowTranslation,
-                    onSeek = { playerController.seekTo(it) },
-                    onExitRequest = { showLyrics = false },
-                    modifier = Modifier.fillMaxSize(),
-                )
             }
 
             Spacer(modifier = Modifier.height(26.dp))
@@ -461,46 +473,6 @@ fun PlayerDetailScreen(
             SongInfoSheet(
                 playerController = playerController,
                 onDismiss = { showSongInfo = false },
-            )
-        }
-    }
-}
-
-@Composable
-private fun LyricsOverlay(
-    visible: Boolean,
-    lines: List<LyricLine>?,
-    currentIndex: Int,
-    positionProvider: () -> Long,
-    isPlaying: Boolean,
-    fontSize: Int,
-    showTranslation: Boolean,
-    onSeek: (Long) -> Unit,
-    onExitRequest: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically { it } + fadeIn(),
-        exit = slideOutVertically { it } + fadeOut(),
-        modifier = modifier,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.86f))
-                // 网易云式交互：点击歌词页空白处返回封面；点歌词行仍是跳转进度
-                .pointerInput(Unit) { detectTapGestures { onExitRequest() } },
-        ) {
-            LyricsList(
-                lines = lines,
-                currentIndex = currentIndex,
-                positionProvider = positionProvider,
-                isPlaying = isPlaying,
-                fontSize = fontSize,
-                showTranslation = showTranslation,
-                onSeek = onSeek,
-                modifier = Modifier.fillMaxSize(),
             )
         }
     }
