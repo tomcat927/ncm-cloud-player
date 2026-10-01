@@ -76,10 +76,24 @@ class PlayerController(
     private val _playMode = MutableStateFlow(PlayMode.ORDER)
     val playMode: StateFlow<PlayMode> = _playMode.asStateFlow()
 
+    // null = 加载中；空列表 = 无歌词
+    private val _lyrics = MutableStateFlow<List<LyricLine>?>(null)
+    val lyrics: StateFlow<List<LyricLine>?> = _lyrics.asStateFlow()
+
+    private val _currentLyricIndex = MutableStateFlow(-1)
+    val currentLyricIndex: StateFlow<Int> = _currentLyricIndex.asStateFlow()
+
     private var queueList: List<CloudSong> = emptyList()
     private var originalQueue: List<CloudSong> = emptyList()
     private var currentIndexValue = -1
     private var progressJob: Job? = null
+    private var lyricsJob: Job? = null
+    // 歌词页可见时加密轮询间隔，行高亮与滚动才跟得上
+    private var progressIntervalMs = 500L
+
+    fun setLyricsVisible(visible: Boolean) {
+        progressIntervalMs = if (visible) 50L else 500L
+    }
 
     init {
         scope.launch {
@@ -108,6 +122,7 @@ class PlayerController(
                 if (playbackState == Player.STATE_READY) {
                     if (player.duration > 0L) _duration.value = player.duration
                     _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+                    updateLyricIndex(_currentPosition.value)
                 }
                 if (playbackState == Player.STATE_ENDED) {
                     stopProgressUpdates()
@@ -213,17 +228,22 @@ class PlayerController(
         }
         player.seekTo(target)
         _currentPosition.value = target
+        updateLyricIndex(target)
     }
 
     fun stop() {
         progressJob?.cancel()
         progressJob = null
+        lyricsJob?.cancel()
+        lyricsJob = null
         controller?.stop()
         queueList = emptyList()
         originalQueue = emptyList()
         currentIndexValue = -1
         publishQueue()
         _nowPlaying.value = null
+        _lyrics.value = null
+        _currentLyricIndex.value = -1
         _currentPosition.value = 0L
         _duration.value = 0L
         updateSkipFlags()
@@ -277,6 +297,7 @@ class PlayerController(
         _currentPosition.value = 0L
         _duration.value = 0L
         updateSkipFlags()
+        loadLyrics(song.songId)
     }
 
     private fun applyPlayMode(mode: PlayMode) {
@@ -350,10 +371,29 @@ class PlayerController(
         progressJob = scope.launch {
             while (isActive) {
                 val player = controller ?: break
-                _currentPosition.value = player.currentPosition.coerceAtLeast(0L)
+                val position = player.currentPosition.coerceAtLeast(0L)
+                _currentPosition.value = position
+                updateLyricIndex(position)
                 if (player.duration > 0L) _duration.value = player.duration
-                delay(500L)
+                delay(progressIntervalMs)
             }
+        }
+    }
+
+    private fun updateLyricIndex(positionMs: Long) {
+        _currentLyricIndex.value = _lyrics.value?.indexOfLineAt(positionMs) ?: -1
+    }
+
+    private fun loadLyrics(songId: Long) {
+        lyricsJob?.cancel()
+        _lyrics.value = null
+        _currentLyricIndex.value = -1
+        lyricsJob = scope.launch {
+            val lines = runCatching { LyricParser.fromResponse(playbackRepository.getLyrics(songId)) }
+                .onFailure { AppLogger.i(TAG, "歌词获取失败 songId=$songId: ${it.message}") }
+                .getOrDefault(emptyList())
+            _lyrics.value = lines
+            updateLyricIndex(_currentPosition.value)
         }
     }
 

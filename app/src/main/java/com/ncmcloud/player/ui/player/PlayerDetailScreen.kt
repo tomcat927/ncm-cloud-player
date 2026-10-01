@@ -1,13 +1,17 @@
 package com.ncmcloud.player.ui.player
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +41,7 @@ import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -94,6 +99,9 @@ fun PlayerDetailScreen(
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
     var showSongInfo by remember { mutableStateOf(false) }
+    var showLyrics by remember { mutableStateOf(false) }
+    val lyrics by playerController.lyrics.collectAsState()
+    val currentLyricIndex by playerController.currentLyricIndex.collectAsState()
 
     // 模式切换反馈：页面内浮动标签，连点时立即换文案并重置停留计时（不受系统 Toast 排队影响）
     var modeHintVisible by remember { mutableStateOf(false) }
@@ -111,6 +119,15 @@ fun PlayerDetailScreen(
     LaunchedEffect(song.songId) {
         isSeeking = false
         seekPosition = 0f
+    }
+
+    // 返回手势优先关闭歌词页，再关闭播放详情页
+    BackHandler(enabled = showLyrics) { showLyrics = false }
+
+    // 歌词可见时加密位置轮询到 50ms，离开或关闭时恢复
+    DisposableEffect(showLyrics) {
+        playerController.setLyricsVisible(showLyrics)
+        onDispose { playerController.setLyricsVisible(false) }
     }
 
     val progress = if (duration > 0L) {
@@ -219,58 +236,104 @@ fun PlayerDetailScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(34.dp))
-
-            SwipeToSkipCover(
-                currentSong = song,
-                previousSong = previousSong,
-                nextSong = nextSong,
-                onConfirmPrevious = { playerController.skipToPrevious() },
-                onConfirmNext = { playerController.skipToNext() },
-                shape = RoundedCornerShape(24.dp),
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f),
-            )
+                    .weight(1f)
+                    .fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(34.dp))
 
-            Spacer(modifier = Modifier.height(30.dp))
+                    SwipeToSkipCover(
+                        currentSong = song,
+                        previousSong = previousSong,
+                        nextSong = nextSong,
+                        onConfirmPrevious = { playerController.skipToPrevious() },
+                        onConfirmNext = { playerController.skipToNext() },
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            // 封面上滑进入歌词页（与横滑切歌手势正交）
+                            .pointerInput(Unit) {
+                                var accumY = 0f
+                                val thresholdPx = 90.dp.toPx()
+                                detectVerticalDragGestures(
+                                    onDragEnd = { accumY = 0f },
+                                    onDragCancel = { accumY = 0f },
+                                ) { _, dragAmount ->
+                                    if (!showLyrics) {
+                                        accumY += dragAmount.y
+                                        if (accumY <= -thresholdPx) {
+                                            accumY = 0f
+                                            showLyrics = true
+                                        }
+                                    }
+                                }
+                            },
+                    )
 
-            Text(
-                song.displayTitle,
-                fontSize = 27.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-                lineHeight = 34.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(modifier = Modifier.height(7.dp))
-            Text(
-                song.displayArtist,
-                fontSize = 15.sp,
-                color = ControlsInactive,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (song.album.isNotBlank()) {
-                Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(30.dp))
+
                 Text(
-                    song.album,
-                    fontSize = 13.sp,
-                    color = Color.White.copy(alpha = 0.58f),
+                    song.displayTitle,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    lineHeight = 34.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(7.dp))
+                Text(
+                    song.displayArtist,
+                    fontSize = 15.sp,
+                    color = ControlsInactive,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
+                if (song.album.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        song.album,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.58f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(9.dp))
-            Text(
-                "${song.bitrate / 1000} kbps · ${formatFileSize(song.fileSize)} · 第 ${currentIndex + 1}/${queue.size} 首",
-                fontSize = 12.sp,
-                color = ControlsInactive.copy(alpha = 0.82f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+                Spacer(modifier = Modifier.height(9.dp))
+                Text(
+                    "${song.bitrate / 1000} kbps · ${formatFileSize(song.fileSize)} · 第 ${currentIndex + 1}/${queue.size} 首",
+                    fontSize = 12.sp,
+                    color = ControlsInactive.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                }
+
+                AnimatedVisibility(
+                    visible = showLyrics,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut(),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.86f)),
+                    ) {
+                        LyricsList(
+                            lines = lyrics,
+                            currentIndex = currentLyricIndex,
+                            onSeek = { playerController.seekTo(it) },
+                            onExitRequest = { showLyrics = false },
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(26.dp))
             DetailProgressSection(
@@ -305,8 +368,6 @@ fun PlayerDetailScreen(
                     color = ControlsInactive,
                 )
             }
-
-            Spacer(modifier = Modifier.weight(1f))
 
             Row(
                 modifier = Modifier
