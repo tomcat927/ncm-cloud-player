@@ -1,6 +1,7 @@
 package com.ncmcloud.player.core.log
 
 import android.content.Context
+import android.os.Build
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -154,6 +155,7 @@ class RemoteLogService(
         return buildString {
             appendLine("ncm-cloud-player diagnostic log")
             appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+            appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
             appendLine("Generated: ${Date()}")
             appendLine("Privacy: redacted snapshot; credentials and personal content removed")
             appendLine()

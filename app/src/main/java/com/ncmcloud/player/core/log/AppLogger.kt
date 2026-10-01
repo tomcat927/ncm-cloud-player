@@ -1,6 +1,7 @@
 package com.ncmcloud.player.core.log
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.core.AppEnvironment
@@ -21,6 +22,11 @@ object AppLogger {
     fun init(context: Context) {
         val dir = File(context.cacheDir, "logs").apply { mkdirs() }
         logFile = File(dir, "app_log.txt")
+        log(
+            "I",
+            "Device",
+            "设备: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})",
+        )
     }
 
     fun d(tag: String, msg: String, tr: Throwable? = null) = log("D", tag, msg, tr)
