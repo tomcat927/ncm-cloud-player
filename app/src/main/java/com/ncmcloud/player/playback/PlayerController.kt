@@ -245,7 +245,11 @@ class PlayerController(
             .getOrNull()
             ?: throw IllegalStateException("获取播放地址失败")
         val url = stream.url ?: throw IllegalStateException("获取播放地址失败")
-        AppLogger.i(TAG, "取址完成 level=$level br=${stream.br} type=${stream.type} size=${stream.size}")
+        AppLogger.i(
+            TAG,
+            "取址完成 songId=${song.songId} name=${song.displayTitle} level=$level " +
+                "br=${stream.br} type=${stream.type} size=${stream.size}",
+        )
         val metadata = MediaMetadata.Builder()
             .setTitle(song.displayTitle)
             .setArtist(song.displayArtist)
