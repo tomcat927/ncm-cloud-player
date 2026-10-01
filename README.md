@@ -23,14 +23,14 @@ Cookie 只保存在本机，不经过任何中间服务器。
 
 ## 构建
 
-本项目不要求本地构建，GitHub Actions 会自动构建。如需本地构建：
+**请勿在本地安装 JDK / Android SDK 等构建环境，也不要在本地执行编译构建。** 编译与发布一律由 GitHub Actions 完成（`.github/workflows/android.yml`）：提交并推送到 `main`，CI 自动构建 Debug / Release APK 并发布 Release，结果在仓库 Actions 页查看（`gh run watch`）。
+
+仅在 CI 不可用等特殊情况下才考虑本地构建兜底（环境要求：JDK 21、Android SDK 36、Gradle 9.3.1，项目内置 Wrapper）：
 
 ```bash
 ./gradlew assembleDebug
 ./gradlew assembleRelease
 ```
-
-环境要求：JDK 21、Android SDK 36、Gradle 9.3.1（项目内置 Wrapper）。
 
 ## 免责声明
 
