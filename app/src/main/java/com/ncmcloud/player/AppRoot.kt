@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.data.AuthRepository
@@ -51,6 +52,14 @@ fun AppRoot() {
     BackHandler(enabled = showPlayerDetail && !showPlayerQueue) {
         AppLogger.i("Nav", "返回键：关闭播放详情页")
         showPlayerDetail = false
+    }
+
+    // 临时埋点：记录详情页关闭后新画面真正渲染出来的时刻，用于区分"处理慢"还是"渲染慢"
+    LaunchedEffect(showPlayerDetail) {
+        if (!showPlayerDetail) {
+            withFrameNanos { }
+            AppLogger.i("Nav", "详情页关闭后首帧已渲染")
+        }
     }
 
     when {
