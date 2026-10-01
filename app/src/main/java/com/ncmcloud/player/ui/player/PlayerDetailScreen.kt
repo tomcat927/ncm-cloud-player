@@ -1,6 +1,9 @@
 package com.ncmcloud.player.ui.player
 
-import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -38,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,7 +54,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -59,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.domain.PlayMode
 import com.ncmcloud.player.playback.PlayerController
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 private val DetailBackdrop = Brush.verticalGradient(
@@ -90,6 +94,17 @@ fun PlayerDetailScreen(
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
     var showSongInfo by remember { mutableStateOf(false) }
+
+    // 模式切换反馈：页面内浮动标签，连点时立即换文案并重置停留计时（不受系统 Toast 排队影响）
+    var modeHintVisible by remember { mutableStateOf(false) }
+    var modeHintTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(modeHintTick) {
+        if (modeHintTick > 0) {
+            modeHintVisible = true
+            delay(1200L)
+            modeHintVisible = false
+        }
+    }
 
     val song = nowPlaying?.song ?: return
 
@@ -299,11 +314,10 @@ fun PlayerDetailScreen(
                     .padding(bottom = 34.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val context = LocalContext.current
                 DetailIconButton(
                     onClick = {
-                        val newMode = playerController.cyclePlayMode()
-                        Toast.makeText(context, newMode.label, Toast.LENGTH_SHORT).show()
+                        playerController.cyclePlayMode()
+                        modeHintTick++
                     },
                 ) {
                     Icon(
@@ -366,6 +380,29 @@ fun PlayerDetailScreen(
 
                 Spacer(modifier = Modifier.weight(1f))
                 Spacer(modifier = Modifier.width(44.dp))
+            }
+        }
+
+        AnimatedVisibility(
+            visible = modeHintVisible,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .offset(y = (-150).dp),
+            enter = fadeIn() + scaleIn(initialScale = 0.85f),
+            exit = fadeOut(),
+        ) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .padding(horizontal = 18.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    playMode.label,
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
         }
 
