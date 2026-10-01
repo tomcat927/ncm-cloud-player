@@ -53,6 +53,8 @@ class UpdateDownloadWorker(
                 workDataOf(
                     "apkPath" to file.absolutePath,
                     "tagName" to info.tagName,
+                    // 输出带上目标版本号，供启动时过滤跨进程残留的完成记录
+                    "versionCode" to info.versionCode,
                 ),
             )
         } catch (e: Exception) {

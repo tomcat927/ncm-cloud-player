@@ -12,6 +12,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.update.UpdateDownloadWorker
 import com.ncmcloud.player.update.UpdateInfo
@@ -157,16 +158,29 @@ class UpdateViewModel(
                     WorkInfo.State.SUCCEEDED -> {
                         val path = info.outputData.getString("apkPath")
                         val tagName = info.outputData.getString("tagName").orEmpty()
+                        val downloadedVersionCode = info.outputData.getLong("versionCode", 0L)
                         if (path.isNullOrBlank()) {
                             _state.value = UpdateState.Error("下载完成但未获取到 APK 路径")
                             AppLogger.e(TAG, "下载成功但输出数据缺少 apkPath")
+                        } else if (downloadedVersionCode <= BuildConfig.VERSION_CODE.toLong()) {
+                            // WorkManager 的完成记录会跨进程存活：每次启动都会重新上报。
+                            // 版本不高于当前 app 的记录属于已安装/同版本的残留（含旧构建未写
+                            // versionCode 的记录），忽略并清理，否则每次打开 app 都会对同版本拉起安装器
+                            AppLogger.i(
+                                TAG,
+                                "忽略残留下载记录: $tagName versionCode=$downloadedVersionCode <= 当前 ${BuildConfig.VERSION_CODE}",
+                            )
+                            runCatching { File(path).delete() }
+                            workManager.pruneWork()
                         } else if (appInForeground) {
                             // 前台：跳过 App 内确认，直接拉起系统安装器（一次确认）
                             AppLogger.i(TAG, "下载完成（前台），直接拉起安装器: $tagName")
                             tryFireInstaller(File(path), tagName)
+                            workManager.pruneWork()
                         } else {
                             _state.value = UpdateState.ReadyToInstall(File(path), tagName)
                             AppLogger.i(TAG, "下载完成（后台），进入待安装状态: $tagName")
+                            workManager.pruneWork()
                         }
                     }
 
