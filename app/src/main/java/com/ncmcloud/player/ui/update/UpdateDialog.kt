@@ -30,8 +30,15 @@ fun UpdateDialog() {
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshInstallPermission()
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    viewModel.setAppForeground(true)
+                    viewModel.refreshInstallPermission()
+                }
+
+                Lifecycle.Event.ON_PAUSE -> viewModel.setAppForeground(false)
+
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -110,24 +117,13 @@ fun UpdateDialog() {
                 onDismissRequest = { viewModel.dismiss() },
                 title = { Text("需要安装权限") },
                 text = {
-                    Text("系统要求先允许本应用安装未知应用。授权后返回，我会继续弹出安装确认。")
+                    Text("系统要求先允许本应用安装未知应用。授权后返回，我会自动继续拉起安装。")
                 },
                 confirmButton = {
                     TextButton(onClick = { viewModel.openInstallPermissionSettings() }) { Text("去授权") }
                 },
                 dismissButton = {
                     TextButton(onClick = { viewModel.dismiss() }) { Text("稍后") }
-                },
-            )
-        }
-
-        is UpdateState.Installing -> {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismiss() },
-                title = { Text("正在安装更新") },
-                text = { Text("系统安装器已打开，请按系统提示完成安装。") },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.dismiss() }) { Text("关闭") }
                 },
             )
         }

@@ -30,9 +30,9 @@ sealed interface UpdateState {
     data class Available(val info: UpdateInfo) : UpdateState
     data object NoUpdate : UpdateState
     data class Downloading(val progress: Float) : UpdateState
+    // 下载完成但 app 在后台（无法直接拉起安装器）时的兜底：等用户回来点一下
     data class ReadyToInstall(val file: File, val tagName: String) : UpdateState
     data class InstallPermissionRequired(val file: File, val tagName: String) : UpdateState
-    data object Installing : UpdateState
     data class Error(val message: String) : UpdateState
 }
 
@@ -44,6 +44,13 @@ class UpdateViewModel(
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
     private val workManager = WorkManager.getInstance(context)
+
+    // 由 UpdateDialog 的生命周期回调维护，决定下载完成后能否直接拉起安装器
+    private var appInForeground = false
+
+    fun setAppForeground(value: Boolean) {
+        appInForeground = value
+    }
 
     init {
         observeDownload()
@@ -88,22 +95,29 @@ class UpdateViewModel(
     }
 
     fun install() {
+        // 兜底路径：app 在后台时完成的下载，等用户回到 app 手动触发
         val current = _state.value as? UpdateState.ReadyToInstall ?: return
+        tryFireInstaller(current.file, current.tagName)
+    }
+
+    // 前台直接拉起系统安装器（与 notion-app-android 一致，系统安装器即唯一一次确认）。
+    // 未授予安装权限时先引导授权，返回后自动继续；后台时兜底为 ReadyToInstall 对话框。
+    private fun tryFireInstaller(file: File, tagName: String) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
-            _state.value = UpdateState.InstallPermissionRequired(current.file, current.tagName)
+            _state.value = UpdateState.InstallPermissionRequired(file, tagName)
             AppLogger.w(TAG, "系统未授予安装未知应用权限")
             return
         }
 
         runCatching {
-            context.startActivity(updateService.createInstallIntent(current.file))
-            _state.value = UpdateState.Installing
-            AppLogger.i(TAG, "已打开系统安装器: ${current.tagName}")
+            context.startActivity(updateService.createInstallIntent(file))
+            _state.value = UpdateState.Idle
+            AppLogger.i(TAG, "已拉起系统安装器: $tagName")
         }.onFailure {
-            _state.value = UpdateState.Error(it.message ?: "无法打开系统安装器")
-            AppLogger.e(TAG, "打开系统安装器失败", it)
+            AppLogger.e(TAG, "拉起系统安装器失败，回退为手动安装", it)
+            _state.value = UpdateState.ReadyToInstall(file, tagName)
         }
     }
 
@@ -112,8 +126,8 @@ class UpdateViewModel(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             context.packageManager.canRequestPackageInstalls()
         ) {
-            _state.value = UpdateState.ReadyToInstall(current.file, current.tagName)
-            AppLogger.i(TAG, "安装未知应用权限已授予")
+            AppLogger.i(TAG, "安装未知应用权限已授予，继续拉起安装器")
+            tryFireInstaller(current.file, current.tagName)
         }
     }
 
@@ -146,9 +160,13 @@ class UpdateViewModel(
                         if (path.isNullOrBlank()) {
                             _state.value = UpdateState.Error("下载完成但未获取到 APK 路径")
                             AppLogger.e(TAG, "下载成功但输出数据缺少 apkPath")
+                        } else if (appInForeground) {
+                            // 前台：跳过 App 内确认，直接拉起系统安装器（一次确认）
+                            AppLogger.i(TAG, "下载完成（前台），直接拉起安装器: $tagName")
+                            tryFireInstaller(File(path), tagName)
                         } else {
                             _state.value = UpdateState.ReadyToInstall(File(path), tagName)
-                            AppLogger.i(TAG, "进入安装确认状态: $tagName")
+                            AppLogger.i(TAG, "下载完成（后台），进入待安装状态: $tagName")
                         }
                     }
 
