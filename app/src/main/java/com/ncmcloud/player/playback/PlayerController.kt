@@ -390,7 +390,7 @@ class PlayerController(
         _currentLyricIndex.value = -1
         lyricsJob = scope.launch {
             val lines = runCatching { LyricParser.fromResponse(playbackRepository.getLyrics(songId)) }
-                .onFailure { AppLogger.i(TAG, "歌词获取失败 songId=$songId: ${it.message}") }
+                .onFailure { AppLogger.i(TAG, "歌词获取失败 songId=$songId", it) }
                 .getOrDefault(emptyList())
             _lyrics.value = lines
             updateLyricIndex(_currentPosition.value)

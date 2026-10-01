@@ -26,22 +26,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.playback.LyricLine
@@ -53,15 +47,14 @@ import kotlin.math.abs
 private val LyricInactive = Color(0xFFB3B3B3)
 
 /**
- * 逐行歌词列表：当前行自动弹簧行居中、点击行跳转播放；
- * 手动拖动暂停跟随 4 秒；列表在顶部继续下拉超过阈值时回调 onExitRequest 返回封面。
+ * 逐行歌词列表：当前行自动弹簧行居中、点击行跳转播放；手动拖动暂停跟随 4 秒。
+ * 返回封面的点击手势由外层歌词页容器处理（加载中/无歌词态没有列表，不能依赖列表滚动事件）。
  */
 @Composable
 fun LyricsList(
     lines: List<LyricLine>?,
     currentIndex: Int,
     onSeek: (Long) -> Unit,
-    onExitRequest: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -91,39 +84,8 @@ fun LyricsList(
         }
     }
 
-    val exitThresholdPx = with(LocalDensity.current) { 120.dp.toPx() }
-    // 回调每次重组都是新实例，不能当 remember key，否则连接对象被反复重建、
-    // 下拉累积值被轮询触发的重组清零，退出手势永远达不到阈值
-    val latestOnExit by rememberUpdatedState(onExitRequest)
-    val exitConnection = remember(exitThresholdPx) {
-        object : NestedScrollConnection {
-            var accumulated = 0f
-
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val atTop = listState.firstVisibleItemIndex == 0 &&
-                    listState.firstVisibleItemScrollOffset == 0
-                if (available.y > 0f && atTop) {
-                    accumulated += available.y
-                    if (accumulated >= exitThresholdPx) {
-                        accumulated = 0f
-                        latestOnExit()
-                    }
-                    return Offset(0f, available.y)
-                }
-                if (available.y <= 0f) accumulated = 0f
-                return Offset.Zero
-            }
-
-            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                accumulated = 0f
-                return Velocity.Zero
-            }
-        }
-    }
-
     Box(
         modifier = modifier
-            .nestedScroll(exitConnection)
             .onSizeChanged { viewportHeightPx = it.height.toFloat() },
     ) {
         when {

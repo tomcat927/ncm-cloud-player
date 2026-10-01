@@ -11,9 +11,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -255,23 +255,11 @@ fun PlayerDetailScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(1f)
-                            // 封面上滑进入歌词页（与横滑切歌手势正交）
-                            .pointerInput(Unit) {
-                                var accumY = 0f
-                                val thresholdPx = 90.dp.toPx()
-                                detectVerticalDragGestures(
-                                    onDragEnd = { accumY = 0f },
-                                    onDragCancel = { accumY = 0f },
-                                ) { _, dragAmount ->
-                                    if (!showLyrics) {
-                                        accumY += dragAmount
-                                        if (accumY <= -thresholdPx) {
-                                            accumY = 0f
-                                            showLyrics = true
-                                        }
-                                    }
-                                }
-                            },
+                            // 网易云式交互：点击封面进入歌词页（与横滑切歌手势正交）
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { showLyrics = true },
                     )
 
                     Spacer(modifier = Modifier.height(30.dp))
@@ -483,13 +471,14 @@ private fun LyricsOverlay(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.86f)),
+                .background(Color.Black.copy(alpha = 0.86f))
+                // 网易云式交互：点击歌词页空白处返回封面；点歌词行仍是跳转进度
+                .pointerInput(Unit) { detectTapGestures { onExitRequest() } },
         ) {
             LyricsList(
                 lines = lines,
                 currentIndex = currentIndex,
                 onSeek = onSeek,
-                onExitRequest = onExitRequest,
                 modifier = Modifier.fillMaxSize(),
             )
         }
