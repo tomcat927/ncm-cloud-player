@@ -12,6 +12,7 @@ import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.data.PlaybackRepository
 import com.ncmcloud.player.domain.CloudSong
+import com.ncmcloud.player.domain.PlayMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -20,6 +21,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -67,9 +69,24 @@ class PlayerController(
     private val _duration = MutableStateFlow(0L)
     val duration: StateFlow<Long> = _duration
 
+    private val _playMode = MutableStateFlow(PlayMode.ORDER)
+    val playMode: StateFlow<PlayMode> = _playMode.asStateFlow()
+
     private var queueList: List<CloudSong> = emptyList()
+    private var originalQueue: List<CloudSong> = emptyList()
     private var currentIndexValue = -1
     private var progressJob: Job? = null
+
+    init {
+        scope.launch {
+            val saved = PlayMode.fromName(settingsPreferences.playMode.first())
+            if (saved != _playMode.value) {
+                _playMode.value = saved
+                applyRepeatMode()
+                updateSkipFlags()
+            }
+        }
+    }
 
     suspend fun connect() = withContext(Dispatchers.Main) {
         if (controller != null) return@withContext
@@ -90,10 +107,17 @@ class PlayerController(
                 }
                 if (playbackState == Player.STATE_ENDED) {
                     stopProgressUpdates()
-                    if (currentIndexValue < queueList.lastIndex) {
-                        skipToNext()
-                    } else {
-                        _currentPosition.value = _duration.value
+                    when (_playMode.value) {
+                        // REPEAT_MODE_ONE 正常不会走到 ENDED，这里兜底重播
+                        PlayMode.SINGLE_LOOP -> launchPlayCurrent()
+                        PlayMode.LIST_LOOP, PlayMode.SHUFFLE -> skipToNext()
+                        PlayMode.ORDER -> {
+                            if (currentIndexValue < queueList.lastIndex) {
+                                skipToNext()
+                            } else {
+                                _currentPosition.value = _duration.value
+                            }
+                        }
                     }
                 }
             }
@@ -130,23 +154,35 @@ class PlayerController(
     suspend fun playQueue(songs: List<CloudSong>, startIndex: Int = 0) {
         if (songs.isEmpty()) return
         queueList = songs
+        originalQueue = songs
         currentIndexValue = startIndex.coerceIn(0, songs.lastIndex)
+        if (_playMode.value == PlayMode.SHUFFLE) reshuffleQueue()
         publishQueue()
         playCurrent()
     }
 
     suspend fun play(song: CloudSong) = playQueue(listOf(song), 0)
 
+    fun cyclePlayMode(): PlayMode {
+        val next = _playMode.value.next()
+        applyPlayMode(next)
+        return next
+    }
+
     fun skipToNext() {
-        if (currentIndexValue < 0 || currentIndexValue >= queueList.lastIndex) return
-        currentIndexValue++
+        if (queueList.isEmpty()) return
+        val wraps = _playMode.value != PlayMode.ORDER
+        if (!wraps && currentIndexValue >= queueList.lastIndex) return
+        currentIndexValue = if (currentIndexValue >= queueList.lastIndex) 0 else currentIndexValue + 1
         publishQueue()
         launchPlayCurrent()
     }
 
     fun skipToPrevious() {
-        if (currentIndexValue <= 0) return
-        currentIndexValue--
+        if (queueList.isEmpty()) return
+        val wraps = _playMode.value != PlayMode.ORDER
+        if (!wraps && currentIndexValue <= 0) return
+        currentIndexValue = if (currentIndexValue <= 0) queueList.lastIndex else currentIndexValue - 1
         publishQueue()
         launchPlayCurrent()
     }
@@ -180,6 +216,7 @@ class PlayerController(
         progressJob = null
         controller?.stop()
         queueList = emptyList()
+        originalQueue = emptyList()
         currentIndexValue = -1
         publishQueue()
         _nowPlaying.value = null
@@ -216,6 +253,7 @@ class PlayerController(
             connect()
             controller
         }
+        applyRepeatMode()
         player?.setMediaItem(item)
         player?.prepare()
         player?.play()
@@ -225,14 +263,70 @@ class PlayerController(
         updateSkipFlags()
     }
 
+    private fun applyPlayMode(mode: PlayMode) {
+        if (_playMode.value == mode) return
+        val wasShuffle = _playMode.value == PlayMode.SHUFFLE
+        _playMode.value = mode
+        scope.launch { settingsPreferences.setPlayMode(mode.name) }
+        if (mode == PlayMode.SHUFFLE) {
+            reshuffleQueue()
+        } else if (wasShuffle) {
+            restoreQueueOrder()
+        }
+        applyRepeatMode()
+        updateSkipFlags()
+    }
+
+    private fun applyRepeatMode() {
+        val player = controller ?: return
+        player.repeatMode = if (_playMode.value == PlayMode.SINGLE_LOOP) {
+            Player.REPEAT_MODE_ONE
+        } else {
+            Player.REPEAT_MODE_OFF
+        }
+    }
+
+    /** 随机模式下重排队列：当前曲目固定到首位，其余打乱；原顺序留在 originalQueue 以便还原。 */
+    private fun reshuffleQueue() {
+        if (queueList.isEmpty()) return
+        val current = queueList.getOrNull(currentIndexValue) ?: return
+        originalQueue = queueList
+        queueList = listOf(current) + queueList
+            .filterIndexed { index, _ -> index != currentIndexValue }
+            .shuffled()
+        currentIndexValue = 0
+        publishQueue()
+    }
+
+    private fun restoreQueueOrder() {
+        val original = originalQueue
+        if (original.isEmpty()) return
+        val current = queueList.getOrNull(currentIndexValue)
+        val restoredIndex = current
+            ?.let { song -> original.indexOfFirst { it.songId == song.songId } }
+            ?: -1
+        queueList = original
+        currentIndexValue = if (restoredIndex >= 0) restoredIndex else 0
+        publishQueue()
+    }
+
     private fun publishQueue() {
         _queue.value = queueList
         _currentIndex.value = currentIndexValue
     }
 
     private fun updateSkipFlags() {
-        _canSkipNext.value = currentIndexValue in 0 until queueList.lastIndex
-        _canSkipPrevious.value = currentIndexValue > 0
+        val wraps = _playMode.value != PlayMode.ORDER
+        _canSkipNext.value = if (wraps) {
+            queueList.isNotEmpty()
+        } else {
+            currentIndexValue in 0 until queueList.lastIndex
+        }
+        _canSkipPrevious.value = if (wraps) {
+            queueList.isNotEmpty()
+        } else {
+            currentIndexValue > 0
+        }
     }
 
     private fun startProgressUpdates() {

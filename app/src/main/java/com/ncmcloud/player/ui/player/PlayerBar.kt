@@ -1,5 +1,6 @@
 package com.ncmcloud.player.ui.player
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,9 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.ncmcloud.player.domain.PlayMode
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.playback.PlayerController
 import org.koin.core.context.GlobalContext
@@ -124,6 +127,8 @@ fun PlayerQueueSheet(
 ) {
     val queue by playerController.queue.collectAsState()
     val currentIndex by playerController.currentIndex.collectAsState()
+    val playMode by playerController.playMode.collectAsState()
+    val context = LocalContext.current
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -131,11 +136,46 @@ fun PlayerQueueSheet(
     ) {
         LazyColumn(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
             item {
-                Text(
-                    "播放队列",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "播放队列",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(
+                        modifier = Modifier.clickable {
+                            val newMode = playerController.cyclePlayMode()
+                            Toast.makeText(context, newMode.label, Toast.LENGTH_SHORT).show()
+                        },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Icon(
+                            playMode.icon(),
+                            contentDescription = playMode.label,
+                            tint = if (playMode == PlayMode.ORDER) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Text(
+                            playMode.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (playMode == PlayMode.ORDER) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                    }
+                }
             }
             itemsIndexed(queue, key = { index, item -> "${item.songId}-$index" }) { index, song ->
                 QueueRow(

@@ -1,5 +1,6 @@
 package com.ncmcloud.player.ui.player
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -49,12 +50,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.ncmcloud.player.domain.PlayMode
 import com.ncmcloud.player.playback.PlayerController
 import java.util.Locale
 
@@ -82,6 +85,7 @@ fun PlayerDetailScreen(
     val duration by playerController.duration.collectAsState()
     val queue by playerController.queue.collectAsState()
     val currentIndex by playerController.currentIndex.collectAsState()
+    val playMode by playerController.playMode.collectAsState()
 
     var isSeeking by remember { mutableStateOf(false) }
     var seekPosition by remember { mutableFloatStateOf(0f) }
@@ -280,7 +284,27 @@ fun PlayerDetailScreen(
                     .padding(bottom = 34.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Spacer(modifier = Modifier.width(38.dp))
+                val context = LocalContext.current
+                DetailIconButton(
+                    onClick = {
+                        val newMode = playerController.cyclePlayMode()
+                        Toast.makeText(context, newMode.label, Toast.LENGTH_SHORT).show()
+                    },
+                ) {
+                    Icon(
+                        playMode.icon(),
+                        contentDescription = playMode.label,
+                        tint = if (playMode == PlayMode.ORDER) {
+                            Color.White.copy(alpha = 0.45f)
+                        } else {
+                            Color.White
+                        },
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+
                 DetailIconButton(
                     onClick = { playerController.skipToPrevious() },
                     enabled = canPrev,
@@ -325,7 +349,8 @@ fun PlayerDetailScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(38.dp))
+                Spacer(modifier = Modifier.weight(1f))
+                Spacer(modifier = Modifier.width(44.dp))
             }
         }
     }
