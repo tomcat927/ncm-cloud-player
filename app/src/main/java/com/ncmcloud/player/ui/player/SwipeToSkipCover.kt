@@ -55,7 +55,8 @@ private enum class SwipeDirection { NEXT, PREVIOUS }
 private class SwipeCoverLayerSpec(
     val layerKey: String,
     val song: CloudSong,
-    val translationX: () -> Float,
+    // 参数名不能叫 translationX，否则会遮蔽 graphicsLayer 作用域里的同名属性
+    val translationXProvider: () -> Float,
 )
 
 /**
@@ -243,7 +244,7 @@ fun SwipeToSkipCover(
             key(layer.layerKey) {
                 SwipeCoverLayer(
                     song = layer.song,
-                    translationX = layer.translationX,
+                    translationXProvider = layer.translationXProvider,
                     shape = shape,
                 )
             }
@@ -254,13 +255,13 @@ fun SwipeToSkipCover(
 @Composable
 private fun SwipeCoverLayer(
     song: CloudSong,
-    translationX: () -> Float,
+    translationXProvider: () -> Float,
     shape: Shape,
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer { translationX = translationX() }
+            .graphicsLayer { translationX = translationXProvider() }
             .aspectRatio(1f)
             .clip(shape)
             .background(Color.White.copy(alpha = 0.08f)),
