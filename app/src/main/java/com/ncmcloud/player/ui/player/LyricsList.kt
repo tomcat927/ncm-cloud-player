@@ -223,6 +223,7 @@ private fun KaraokeLineText(
         }
     }
     val styled = buildAnnotatedString {
+        append(line.text)
         var charStart = 0
         for (word in line.words) {
             val wordEnd = charStart + word.text.length
