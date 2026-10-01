@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.domain.PlayMode
+import com.ncmcloud.player.playback.LyricLine
 import com.ncmcloud.player.playback.PlayerController
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -263,7 +264,7 @@ fun PlayerDetailScreen(
                                     onDragCancel = { accumY = 0f },
                                 ) { _, dragAmount ->
                                     if (!showLyrics) {
-                                        accumY += dragAmount.y
+                                        accumY += dragAmount
                                         if (accumY <= -thresholdPx) {
                                             accumY = 0f
                                             showLyrics = true
@@ -313,26 +314,14 @@ fun PlayerDetailScreen(
                 )
                 }
 
-                AnimatedVisibility(
+                LyricsOverlay(
                     visible = showLyrics,
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut(),
+                    lines = lyrics,
+                    currentIndex = currentLyricIndex,
+                    onSeek = { playerController.seekTo(it) },
+                    onExitRequest = { showLyrics = false },
                     modifier = Modifier.fillMaxSize(),
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.86f)),
-                    ) {
-                        LyricsList(
-                            lines = lyrics,
-                            currentIndex = currentLyricIndex,
-                            onSeek = { playerController.seekTo(it) },
-                            onExitRequest = { showLyrics = false },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
+                )
             }
 
             Spacer(modifier = Modifier.height(26.dp))
@@ -471,6 +460,37 @@ fun PlayerDetailScreen(
             SongInfoSheet(
                 playerController = playerController,
                 onDismiss = { showSongInfo = false },
+            )
+        }
+    }
+}
+
+@Composable
+private fun LyricsOverlay(
+    visible: Boolean,
+    lines: List<LyricLine>?,
+    currentIndex: Int,
+    onSeek: (Long) -> Unit,
+    onExitRequest: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+        modifier = modifier,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.86f)),
+        ) {
+            LyricsList(
+                lines = lines,
+                currentIndex = currentIndex,
+                onSeek = onSeek,
+                onExitRequest = onExitRequest,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
