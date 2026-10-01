@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -234,15 +233,6 @@ fun PlayerDetailScreen(
                         modifier = Modifier.size(26.dp),
                     )
                 }
-
-                DetailIconButton(onClick = onOpenQueue) {
-                    Icon(
-                        Icons.Filled.QueueMusic,
-                        contentDescription = "播放队列",
-                        tint = Color.White,
-                        modifier = Modifier.size(26.dp),
-                    )
-                }
             }
 
             Box(
@@ -443,7 +433,16 @@ fun PlayerDetailScreen(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                Spacer(modifier = Modifier.width(44.dp))
+
+                // 与左端的播放模式按钮左右对称
+                DetailIconButton(onClick = onOpenQueue) {
+                    Icon(
+                        Icons.Filled.QueueMusic,
+                        contentDescription = "播放队列",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
             }
         }
 
