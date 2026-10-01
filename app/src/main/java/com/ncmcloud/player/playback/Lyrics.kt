@@ -85,8 +85,9 @@ object LyricParser {
                     durationMs = wordMatch.groupValues[2].toLong(),
                 )
             }.toList()
-            val text = words.joinToString("") { it.text }.trim()
-            if (text.isEmpty()) null else LyricLine(timeMs = start, durationMs = duration, text = text, words = words)
+            // text 必须是 words 的原样拼接（不能 trim），卡拉OK逐字渲染按拼接长度映射字符区间
+            val text = words.joinToString("") { it.text }
+            if (text.isBlank()) null else LyricLine(timeMs = start, durationMs = duration, text = text, words = words)
         }.sortedBy { it.timeMs }
 
     fun parseLrc(content: String): List<LyricLine> =

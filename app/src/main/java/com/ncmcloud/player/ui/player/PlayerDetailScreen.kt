@@ -66,8 +66,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.domain.PlayMode
+import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.playback.LyricLine
 import com.ncmcloud.player.playback.PlayerController
+import org.koin.core.context.GlobalContext
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -103,6 +105,11 @@ fun PlayerDetailScreen(
     var showLyrics by remember { mutableStateOf(false) }
     val lyrics by playerController.lyrics.collectAsState()
     val currentLyricIndex by playerController.currentLyricIndex.collectAsState()
+
+    // 歌词偏好（字号/翻译开关）从设置页读取
+    val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
+    val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(initial = 20)
+    val lyricShowTranslation by settingsPreferences.lyricTranslationEnabled.collectAsState(initial = true)
 
     // 模式切换反馈：页面内浮动标签，连点时立即换文案并重置停留计时（不受系统 Toast 排队影响）
     var modeHintVisible by remember { mutableStateOf(false) }
@@ -306,6 +313,10 @@ fun PlayerDetailScreen(
                     visible = showLyrics,
                     lines = lyrics,
                     currentIndex = currentLyricIndex,
+                    positionProvider = { playerController.estimatedPositionMs() },
+                    isPlaying = isPlaying,
+                    fontSize = lyricFontSize,
+                    showTranslation = lyricShowTranslation,
                     onSeek = { playerController.seekTo(it) },
                     onExitRequest = { showLyrics = false },
                     modifier = Modifier.fillMaxSize(),
@@ -458,6 +469,10 @@ private fun LyricsOverlay(
     visible: Boolean,
     lines: List<LyricLine>?,
     currentIndex: Int,
+    positionProvider: () -> Long,
+    isPlaying: Boolean,
+    fontSize: Int,
+    showTranslation: Boolean,
     onSeek: (Long) -> Unit,
     onExitRequest: () -> Unit,
     modifier: Modifier = Modifier,
@@ -478,6 +493,10 @@ private fun LyricsOverlay(
             LyricsList(
                 lines = lines,
                 currentIndex = currentIndex,
+                positionProvider = positionProvider,
+                isPlaying = isPlaying,
+                fontSize = fontSize,
+                showTranslation = showTranslation,
                 onSeek = onSeek,
                 modifier = Modifier.fillMaxSize(),
             )

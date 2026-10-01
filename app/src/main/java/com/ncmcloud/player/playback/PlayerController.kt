@@ -2,6 +2,7 @@ package com.ncmcloud.player.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -10,6 +11,7 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
+import com.ncmcloud.player.data.LyricsCache
 import com.ncmcloud.player.data.PlaybackRepository
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.domain.PlayMode
@@ -45,6 +47,7 @@ class PlayerController(
     private val context: Context,
     private val playbackRepository: PlaybackRepository,
     private val settingsPreferences: SettingsPreferences,
+    private val lyricsCache: LyricsCache,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var controller: MediaController? = null
@@ -90,9 +93,25 @@ class PlayerController(
     private var lyricsJob: Job? = null
     // 歌词页可见时加密轮询间隔，行高亮与滚动才跟得上
     private var progressIntervalMs = 500L
+    // 供卡拉OK逐帧插值：最近一次轮询的位置与时刻
+    private var lastKnownPositionMs = 0L
+    private var lastKnownPositionAt = 0L
 
     fun setLyricsVisible(visible: Boolean) {
         progressIntervalMs = if (visible) 50L else 500L
+    }
+
+    // 轮询间隙内按播放时长外推当前位置，卡拉OK逐字进度才能平滑
+    fun estimatedPositionMs(): Long {
+        if (!_isPlaying.value || lastKnownPositionAt == 0L) return lastKnownPositionMs
+        val estimate = lastKnownPositionMs + (SystemClock.elapsedRealtime() - lastKnownPositionAt)
+        val durationMs = _duration.value
+        return if (durationMs > 0L) estimate.coerceAtMost(durationMs) else estimate
+    }
+
+    private fun recordLastKnownPosition(positionMs: Long) {
+        lastKnownPositionMs = positionMs
+        lastKnownPositionAt = SystemClock.elapsedRealtime()
     }
 
     init {
@@ -228,6 +247,7 @@ class PlayerController(
         }
         player.seekTo(target)
         _currentPosition.value = target
+        recordLastKnownPosition(target)
         updateLyricIndex(target)
     }
 
@@ -373,6 +393,7 @@ class PlayerController(
                 val player = controller ?: break
                 val position = player.currentPosition.coerceAtLeast(0L)
                 _currentPosition.value = position
+                recordLastKnownPosition(position)
                 updateLyricIndex(position)
                 if (player.duration > 0L) _duration.value = player.duration
                 delay(progressIntervalMs)
@@ -389,10 +410,18 @@ class PlayerController(
         _lyrics.value = null
         _currentLyricIndex.value = -1
         lyricsJob = scope.launch {
-            val lines = runCatching { LyricParser.fromResponse(playbackRepository.getLyrics(songId)) }
+            val cacheEnabled = settingsPreferences.lyricCacheEnabled.first()
+            val cached = if (cacheEnabled) lyricsCache.load(songId) else null
+            val response = cached ?: runCatching { playbackRepository.getLyrics(songId) }
                 .onFailure { AppLogger.i(TAG, "歌词获取失败 songId=$songId", it) }
-                .getOrDefault(emptyList())
-            _lyrics.value = lines
+                .getOrNull()
+            if (response == null) {
+                _lyrics.value = emptyList()
+                updateLyricIndex(_currentPosition.value)
+                return@launch
+            }
+            if (cacheEnabled && cached == null) lyricsCache.save(songId, response)
+            _lyrics.value = runCatching { LyricParser.fromResponse(response) }.getOrDefault(emptyList())
             updateLyricIndex(_currentPosition.value)
         }
     }

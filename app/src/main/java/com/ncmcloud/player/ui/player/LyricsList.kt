@@ -24,16 +24,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,12 +53,17 @@ private val LyricInactive = Color(0xFFB3B3B3)
 
 /**
  * 逐行歌词列表：当前行自动弹簧行居中、点击行跳转播放；手动拖动暂停跟随 4 秒。
+ * YRC 歌曲的当前行做逐字卡拉OK填色（帧驱动 + 轮询位置外推）。
  * 返回封面的点击手势由外层歌词页容器处理（加载中/无歌词态没有列表，不能依赖列表滚动事件）。
  */
 @Composable
 fun LyricsList(
     lines: List<LyricLine>?,
     currentIndex: Int,
+    positionProvider: () -> Long,
+    isPlaying: Boolean,
+    fontSize: Int,
+    showTranslation: Boolean,
     onSeek: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -120,6 +130,10 @@ fun LyricsList(
                     LyricLineRow(
                         line = line,
                         isCurrent = index == currentIndex,
+                        positionProvider = positionProvider,
+                        isPlaying = isPlaying,
+                        fontSize = fontSize,
+                        showTranslation = showTranslation,
                         onClick = { onSeek(line.timeMs) },
                     )
                 }
@@ -132,6 +146,10 @@ fun LyricsList(
 private fun LyricLineRow(
     line: LyricLine,
     isCurrent: Boolean,
+    positionProvider: () -> Long,
+    isPlaying: Boolean,
+    fontSize: Int,
+    showTranslation: Boolean,
     onClick: () -> Unit,
 ) {
     val scale by animateFloatAsState(
@@ -155,23 +173,83 @@ private fun LyricLineRow(
             .padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            line.text,
-            color = if (isCurrent) Color.White else LyricInactive,
-            fontSize = if (isCurrent) 20.sp else 17.sp,
-            fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
-            textAlign = TextAlign.Center,
-        )
-        line.translation?.takeIf { it.isNotBlank() }?.let { translation ->
+        if (isCurrent && line.words.isNotEmpty()) {
+            KaraokeLineText(
+                line = line,
+                positionProvider = positionProvider,
+                isPlaying = isPlaying,
+                fontSize = fontSize,
+            )
+        } else {
             Text(
-                translation,
-                color = if (isCurrent) Color.White.copy(alpha = 0.72f) else LyricInactive.copy(alpha = 0.75f),
-                fontSize = 13.sp,
+                line.text,
+                color = if (isCurrent) Color.White else LyricInactive,
+                fontSize = (if (isCurrent) fontSize else fontSize - 3).sp,
+                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp),
             )
         }
+        if (showTranslation) {
+            line.translation?.takeIf { it.isNotBlank() }?.let { translation ->
+                Text(
+                    translation,
+                    color = if (isCurrent) Color.White.copy(alpha = 0.72f) else LyricInactive.copy(alpha = 0.75f),
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
     }
+}
+
+/**
+ * YRC 逐字卡拉OK：帧驱动读取外推位置，按每个字的起止时间在灰/白之间插值填色。
+ * line.text 必须等于 words 的原样拼接（解析器已保证），否则字符区间映射会错位。
+ */
+@Composable
+private fun KaraokeLineText(
+    line: LyricLine,
+    positionProvider: () -> Long,
+    isPlaying: Boolean,
+    fontSize: Int,
+) {
+    var animatedPosition by remember { mutableLongStateOf(line.timeMs) }
+    LaunchedEffect(isPlaying, line) {
+        while (isActive) {
+            animatedPosition = positionProvider()
+            withFrameNanos { }
+        }
+    }
+    val styled = buildAnnotatedString {
+        var charStart = 0
+        for (word in line.words) {
+            val wordEnd = charStart + word.text.length
+            val wordStartMs = line.timeMs + word.startOffsetMs
+            val wordEndMs = wordStartMs + word.durationMs
+            val progress = when {
+                animatedPosition >= wordEndMs -> 1f
+                animatedPosition <= wordStartMs -> 0f
+                word.durationMs <= 0L -> 1f
+                else -> (animatedPosition - wordStartMs).toFloat() / word.durationMs
+            }
+            if (progress > 0f) {
+                addStyle(
+                    SpanStyle(color = lerp(LyricInactive, Color.White, progress)),
+                    charStart,
+                    wordEnd,
+                )
+            }
+            charStart = wordEnd
+        }
+    }
+    Text(
+        styled,
+        color = LyricInactive,
+        fontSize = fontSize.sp,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+    )
 }
 
 // 弹簧逐帧滚动到目标位移（目标 = 当前行中心与视口中心的差值）。
