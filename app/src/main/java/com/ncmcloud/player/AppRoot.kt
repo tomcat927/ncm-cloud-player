@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.data.AuthRepository
 import com.ncmcloud.player.playback.PlayerController
 import com.ncmcloud.player.ui.cloud.CloudScreen
