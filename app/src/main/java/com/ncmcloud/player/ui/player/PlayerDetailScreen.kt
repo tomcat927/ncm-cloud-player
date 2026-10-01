@@ -336,6 +336,7 @@ fun PlayerDetailScreen(
                     }
                 }
             }
+        }
 
             Spacer(modifier = Modifier.height(26.dp))
             DetailProgressSection(
