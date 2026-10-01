@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.playback.LyricLine
 import com.ncmcloud.player.playback.lyricLineKey
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlin.math.abs
 
 // ControlsInactive 与播放详情页同色系
