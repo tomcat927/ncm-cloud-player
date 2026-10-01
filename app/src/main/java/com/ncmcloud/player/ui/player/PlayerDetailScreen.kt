@@ -238,7 +238,10 @@ fun PlayerDetailScreen(
                     )
                 }
 
-                DetailIconButton(onClick = { showSongInfo = true }) {
+                DetailIconButton(onClick = {
+                    AppLogger.i("UI", "点击:详情页-歌曲信息")
+                    showSongInfo = true
+                }) {
                     Icon(
                         Icons.Filled.MoreVert,
                         contentDescription = "歌曲信息",
@@ -264,7 +267,12 @@ fun PlayerDetailScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .pointerInput(Unit) { detectTapGestures { showLyrics = false } },
+                                .pointerInput(Unit) {
+                                    detectTapGestures {
+                                        AppLogger.i("UI", "点击:歌词页空白返回封面")
+                                        showLyrics = false
+                                    }
+                                },
                         ) {
                             LyricsList(
                                 lines = lyrics,
@@ -273,7 +281,10 @@ fun PlayerDetailScreen(
                                 isPlaying = isPlaying,
                                 fontSize = lyricFontSize,
                                 showTranslation = lyricShowTranslation,
-                                onSeek = { playerController.seekTo(it) },
+                                onSeek = {
+                                    AppLogger.i("UI", "点击:歌词行跳转")
+                                    playerController.seekTo(it)
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -285,8 +296,14 @@ fun PlayerDetailScreen(
                         currentSong = song,
                         previousSong = previousSong,
                         nextSong = nextSong,
-                        onConfirmPrevious = { playerController.skipToPrevious() },
-                        onConfirmNext = { playerController.skipToNext() },
+                        onConfirmPrevious = {
+                            AppLogger.i("UI", "横滑切歌:上一首")
+                            playerController.skipToPrevious()
+                        },
+                        onConfirmNext = {
+                            AppLogger.i("UI", "横滑切歌:下一首")
+                            playerController.skipToNext()
+                        },
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -295,7 +312,10 @@ fun PlayerDetailScreen(
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                            ) { showLyrics = true },
+                            ) {
+                                AppLogger.i("UI", "点击:封面进入歌词页")
+                                showLyrics = true
+                            },
                     )
 
                     Spacer(modifier = Modifier.height(30.dp))
@@ -383,7 +403,8 @@ fun PlayerDetailScreen(
             ) {
                 DetailIconButton(
                     onClick = {
-                        playerController.cyclePlayMode()
+                        val newMode = playerController.cyclePlayMode()
+                        AppLogger.i("UI", "点击:详情页-播放模式→${newMode.label}")
                         modeHintTick++
                     },
                 ) {
@@ -402,7 +423,10 @@ fun PlayerDetailScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 DetailIconButton(
-                    onClick = { playerController.skipToPrevious() },
+                    onClick = {
+                        AppLogger.i("UI", "点击:详情页-上一首")
+                        playerController.skipToPrevious()
+                    },
                     enabled = canPrev,
                 ) {
                     Icon(
@@ -420,7 +444,10 @@ fun PlayerDetailScreen(
                         .size(74.dp)
                         .clip(CircleShape)
                         .background(Color.White)
-                        .clickable { playerController.togglePlay() },
+                        .clickable {
+                            AppLogger.i("UI", "点击:详情页-播放暂停(播放中=$isPlaying)")
+                            playerController.togglePlay()
+                        },
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(
@@ -434,7 +461,10 @@ fun PlayerDetailScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 DetailIconButton(
-                    onClick = { playerController.skipToNext() },
+                    onClick = {
+                        AppLogger.i("UI", "点击:详情页-下一首")
+                        playerController.skipToNext()
+                    },
                     enabled = canNext,
                 ) {
                     Icon(
@@ -448,7 +478,10 @@ fun PlayerDetailScreen(
                 Spacer(modifier = Modifier.weight(1f))
 
                 // 与左端的播放模式按钮左右对称
-                DetailIconButton(onClick = onOpenQueue) {
+                DetailIconButton(onClick = {
+                    AppLogger.i("UI", "点击:详情页-播放队列")
+                    onOpenQueue()
+                }) {
                     Icon(
                         Icons.Filled.QueueMusic,
                         contentDescription = "播放队列",

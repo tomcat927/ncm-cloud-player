@@ -55,6 +55,13 @@ fun AppRoot() {
         showPlayerDetail = false
     }
 
+    LaunchedEffect(showLogs, showSettings, showPlayerDetail, showPlayerQueue) {
+        AppLogger.i(
+            "Nav",
+            "页面状态: 日志页=$showLogs 设置页=$showSettings 详情页=$showPlayerDetail 队列=$showPlayerQueue",
+        )
+    }
+
     // 临时埋点：记录详情页关闭后新画面真正渲染出来的时刻，用于区分"处理慢"还是"渲染慢"
     LaunchedEffect(showPlayerDetail) {
         if (!showPlayerDetail) {

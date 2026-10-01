@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.BuildConfig
+import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.ui.cloud.CloudViewModel
 import kotlinx.coroutines.launch
@@ -300,7 +301,10 @@ private fun SettingsActionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable {
+                AppLogger.i("UI", "点击:设置-$title")
+                onClick()
+            }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -364,7 +368,13 @@ private fun SettingsSwitchRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            onCheckedChange = {
+                AppLogger.i("UI", "点击:设置-$title=$it")
+                onCheckedChange(it)
+            },
+        )
     }
 }
 

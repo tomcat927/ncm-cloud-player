@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.data.CloudDiskSummary
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.ui.player.PlayerBar
@@ -175,7 +176,10 @@ fun CloudScreen(
                                 items(filtered, key = { it.songId }) { song ->
                                     CloudSongRow(
                                         song = song,
-                                        onClick = { viewModel.play(song) },
+                                        onClick = {
+                                            AppLogger.i("UI", "点击:播放《${song.displayTitle}》")
+                                            viewModel.play(song)
+                                        },
                                     )
                                 }
                                 item {
@@ -185,7 +189,10 @@ fun CloudScreen(
                                             .padding(16.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        TextButton(onClick = { viewModel.loadNextPage() }) {
+                                        TextButton(onClick = {
+                                            AppLogger.i("UI", "点击:加载更多")
+                                            viewModel.loadNextPage()
+                                        }) {
                                             Text("加载更多")
                                         }
                                     }

@@ -41,6 +41,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.domain.PlayMode
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.playback.PlayerController
@@ -95,22 +96,37 @@ fun PlayerBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IconButton(onClick = onOpenQueue) {
+            IconButton(onClick = {
+                AppLogger.i("UI", "点击:迷你条-播放队列")
+                onOpenQueue()
+            }) {
                 Icon(Icons.Filled.QueueMusic, contentDescription = "播放队列")
             }
-            IconButton(onClick = { playerController.skipToPrevious() }, enabled = canPrev) {
+            IconButton(onClick = {
+                AppLogger.i("UI", "点击:迷你条-上一首")
+                playerController.skipToPrevious()
+            }, enabled = canPrev) {
                 Icon(Icons.Filled.SkipPrevious, contentDescription = "上一首")
             }
-            IconButton(onClick = { playerController.togglePlay() }) {
+            IconButton(onClick = {
+                AppLogger.i("UI", "点击:迷你条-播放暂停(播放中=$isPlaying)")
+                playerController.togglePlay()
+            }) {
                 Icon(
                     if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     contentDescription = if (isPlaying) "暂停" else "播放",
                 )
             }
-            IconButton(onClick = { playerController.skipToNext() }, enabled = canNext) {
+            IconButton(onClick = {
+                AppLogger.i("UI", "点击:迷你条-下一首")
+                playerController.skipToNext()
+            }, enabled = canNext) {
                 Icon(Icons.Filled.SkipNext, contentDescription = "下一首")
             }
-            IconButton(onClick = { playerController.stop() }) {
+            IconButton(onClick = {
+                AppLogger.i("UI", "点击:迷你条-停止")
+                playerController.stop()
+            }) {
                 Icon(Icons.Filled.Stop, contentDescription = "停止")
             }
         }
@@ -177,6 +193,7 @@ fun PlayerQueueSheet(
                     song = song,
                     isCurrent = index == currentIndex,
                     onClick = {
+                        AppLogger.i("UI", "点击:队列-第${index + 1}首《${song.displayTitle}》")
                         playerController.playAtIndex(index)
                         onDismiss()
                     },
