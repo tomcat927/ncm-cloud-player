@@ -44,7 +44,9 @@ fun List<LyricLine>.indexOfLineAt(positionMs: Long): Int {
 object LyricParser {
 
     private val YrcLineRegex = Regex("""^\[(\d+),(\d+)](.*)$""")
-    private val YrcWordRegex = Regex("""\((\d+),(\d+),\d+)([^(\n]+)""")
+    // 注意：元组右括号与字符类内的左括号都必须转义——Android 的 ICU 正则不接受裸括号
+    // （桌面版 Java 正则允许，CI 编译期发现不了），否则 PatternSyntaxException 会让整个解析器失效
+    private val YrcWordRegex = Regex("""\((\d+),(\d+),\d+\)([^\(\n]+)""")
     private val LrcTimeTagRegex = Regex("""\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 
     fun fromResponse(resp: LyricResponse): List<LyricLine> {
