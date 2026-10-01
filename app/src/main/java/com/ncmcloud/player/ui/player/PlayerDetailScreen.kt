@@ -1,6 +1,11 @@
 package com.ncmcloud.player.ui.player
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -23,11 +29,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QueueMusic
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,14 +41,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.playback.PlayerController
 import java.util.Locale
+
+private val DetailBackdrop = Brush.verticalGradient(
+    colors = listOf(
+        Color(0xFF3C1616),
+        Color(0xFF261314),
+        Color(0xFF181112),
+    ),
+)
+
+private val ControlsInactive = Color(0xFFB3B3B3)
 
 @Composable
 fun PlayerDetailScreen(
@@ -73,17 +92,38 @@ fun PlayerDetailScreen(
         seekPosition = 0f
     }
 
-    val progress = when {
-        isSeeking -> seekPosition
-        duration > 0L -> currentPosition.toFloat() / duration
-        else -> 0f
-    }.coerceIn(0f, 1f)
+    val progress = if (duration > 0L) {
+        if (isSeeking) seekPosition else (currentPosition.toFloat() / duration).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
+            .background(DetailBackdrop),
     ) {
+        if (song.albumPicUrl.isNotBlank()) {
+            AsyncImage(
+                model = song.albumPicUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                alpha = 0.24f,
+                modifier = Modifier.fillMaxSize(),
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color(0xFF3C1616).copy(alpha = 0.82f),
+                            0.55f to Color(0xFF261314).copy(alpha = 0.72f),
+                            1f to Color(0xFF181112).copy(alpha = 0.92f),
+                        ),
+                    ),
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -91,30 +131,54 @@ fun PlayerDetailScreen(
                 .padding(horizontal = 24.dp),
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "收起播放页")
+                DetailIconButton(onClick = onClose) {
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "收起播放页",
+                        tint = Color.White,
+                        modifier = Modifier.size(32.dp),
+                    )
                 }
-                Text(
-                    "正在播放",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                IconButton(onClick = onOpenQueue) {
-                    Icon(Icons.Filled.QueueMusic, contentDescription = "播放队列")
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "NOW PLAYING",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White.copy(alpha = 0.62f),
+                    )
+                    Text(
+                        "云盘歌曲",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
+
+                DetailIconButton(onClick = onOpenQueue) {
+                    Icon(
+                        Icons.Filled.QueueMusic,
+                        contentDescription = "播放队列",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp),
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.height(34.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp)
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.White.copy(alpha = 0.08f)),
                 contentAlignment = Alignment.Center,
             ) {
                 if (song.albumPicUrl.isNotBlank()) {
@@ -128,118 +192,241 @@ fun PlayerDetailScreen(
                     Icon(
                         Icons.Filled.MusicNote,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(56.dp),
+                        tint = Color.White.copy(alpha = 0.72f),
+                        modifier = Modifier.size(62.dp),
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(30.dp))
+
             Text(
                 song.displayTitle,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
+                fontSize = 27.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color.White,
+                lineHeight = 34.sp,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(7.dp))
             Text(
                 song.displayArtist,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 15.sp,
+                color = ControlsInactive,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                song.album.ifBlank { "未知专辑" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (song.album.isNotBlank()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    song.album,
+                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.58f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(9.dp))
             Text(
                 "${song.bitrate / 1000} kbps · ${formatFileSize(song.fileSize)} · 第 ${currentIndex + 1}/${queue.size} 首",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 12.sp,
+                color = ControlsInactive.copy(alpha = 0.82f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
-            Slider(
-                value = progress,
-                onValueChange = { value ->
+            Spacer(modifier = Modifier.height(26.dp))
+            DetailProgressSection(
+                progress = progress,
+                enabled = duration > 0L,
+                onSeek = { value ->
                     isSeeking = true
                     seekPosition = value
                 },
-                onValueChangeFinished = {
+                onSeekFinished = { value ->
                     if (duration > 0L) {
-                        playerController.seekTo((seekPosition * duration).toLong())
+                        playerController.seekTo((value * duration).toLong())
                     }
                     isSeeking = false
                 },
-                valueRange = 0f..1f,
-                enabled = duration > 0L,
             )
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 3.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     formatDuration(if (isSeeking) (seekPosition * duration).toLong() else currentPosition),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    color = ControlsInactive,
                 )
                 Text(
                     formatDuration(duration),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    color = ControlsInactive,
                 )
             }
 
             Spacer(modifier = Modifier.weight(1f))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 32.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(bottom = 34.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
+                Spacer(modifier = Modifier.width(38.dp))
+                DetailIconButton(
                     onClick = { playerController.skipToPrevious() },
                     enabled = canPrev,
                 ) {
                     Icon(
                         Icons.Filled.SkipPrevious,
                         contentDescription = "上一首",
-                        modifier = Modifier.size(40.dp),
+                        tint = Color.White,
+                        modifier = Modifier.size(46.dp),
                     )
                 }
-                FloatingActionButton(
-                    onClick = { playerController.togglePlay() },
-                    shape = CircleShape,
-                    modifier = Modifier.size(72.dp),
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Box(
+                    modifier = Modifier
+                        .size(74.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable { playerController.togglePlay() },
+                    contentAlignment = Alignment.Center,
                 ) {
                     Icon(
                         if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                         contentDescription = if (isPlaying) "暂停" else "播放",
-                        modifier = Modifier.size(38.dp),
+                        tint = Color.Black,
+                        modifier = Modifier.size(42.dp),
                     )
                 }
-                IconButton(
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                DetailIconButton(
                     onClick = { playerController.skipToNext() },
                     enabled = canNext,
                 ) {
                     Icon(
                         Icons.Filled.SkipNext,
                         contentDescription = "下一首",
-                        modifier = Modifier.size(40.dp),
+                        tint = Color.White,
+                        modifier = Modifier.size(46.dp),
                     )
                 }
+
+                Spacer(modifier = Modifier.width(38.dp))
             }
+        }
+    }
+}
+
+@Composable
+private fun DetailIconButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .background(Color.White.copy(alpha = 0.08f))
+            .alpha(if (enabled) 1f else 0.35f)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun DetailProgressSection(
+    progress: Float,
+    enabled: Boolean,
+    onSeek: (Float) -> Unit,
+    onSeekFinished: (Float) -> Unit,
+) {
+    var rawPosition by remember { mutableFloatStateOf(0f) }
+    var trackWidthPx by remember { mutableFloatStateOf(0f) }
+    val density = LocalDensity.current
+
+    fun updateSeek(value: Float) {
+        rawPosition = value.coerceIn(0f, 1f)
+        onSeek(rawPosition)
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(30.dp)
+            .onSizeChanged { trackWidthPx = it.width.toFloat() }
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = { offset ->
+                        if (trackWidthPx <= 0f) return@detectTapGestures
+                        updateSeek(offset.x / trackWidthPx)
+                        if (tryAwaitRelease()) {
+                            onSeekFinished(rawPosition)
+                        }
+                    },
+                )
+            }
+            .draggable(
+                orientation = Orientation.Horizontal,
+                enabled = enabled,
+                state = rememberDraggableState { delta ->
+                    if (trackWidthPx <= 0f) return@rememberDraggableState
+                    updateSeek(rawPosition + delta / trackWidthPx)
+                },
+                onDragStarted = {
+                    if (trackWidthPx > 0f && enabled) {
+                        updateSeek(rawPosition)
+                    }
+                },
+                onDragStopped = {
+                    if (enabled) {
+                        onSeekFinished(rawPosition)
+                    }
+                },
+            ),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.24f)),
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White),
+        )
+        if (trackWidthPx > 0f) {
+            val thumbSizePx = with(density) { 12.dp.toPx() }
+            val offset = with(density) {
+                ((progress * trackWidthPx - thumbSizePx / 2f).coerceIn(0f, trackWidthPx - thumbSizePx)).toDp()
+            }
+            Box(
+                modifier = Modifier
+                    .offset(x = offset)
+                    .size(12.dp)
+                    .background(Color.White, CircleShape),
+            )
         }
     }
 }
