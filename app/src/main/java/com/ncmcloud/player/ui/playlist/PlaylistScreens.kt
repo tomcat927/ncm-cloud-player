@@ -65,6 +65,7 @@ import org.koin.core.context.GlobalContext
 fun PlaylistScreen(onClose: () -> Unit) {
     val viewModel: PlaylistViewModel = koinViewModel()
     val detail by viewModel.detail.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
     val playlistsLoading by viewModel.playlistsLoading.collectAsState()
     val playlistsError by viewModel.playlistsError.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
