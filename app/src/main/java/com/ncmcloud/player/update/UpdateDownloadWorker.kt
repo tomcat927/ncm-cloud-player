@@ -40,7 +40,9 @@ class UpdateDownloadWorker(
             releaseNotes = inputData.getString("releaseNotes"),
         )
         AppLogger.i(TAG, "开始更新下载: tag=${info.tagName}, versionCode=${info.versionCode}")
-        setForeground(createProgressForegroundInfo(-1f))
+        // App 已在后台时进程被重新拉起重试下载，前台服务启动会被系统拒绝——降级为普通后台任务继续下载
+        runCatching { setForeground(createProgressForegroundInfo(-1f)) }
+            .onFailure { AppLogger.w(TAG, "前台服务启动失败，按后台任务继续下载", it) }
         val updateService = GlobalContext.get().get<UpdateService>()
         return try {
             val file = updateService.downloadApk(info) { progress ->
