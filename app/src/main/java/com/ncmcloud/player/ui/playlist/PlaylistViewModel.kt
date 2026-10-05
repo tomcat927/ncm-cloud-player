@@ -116,14 +116,28 @@ class PlaylistViewModel(
     fun playPlaylist() {
         val detail = _detail.value ?: return
         if (detail.tracks.isNotEmpty()) {
-            playerController.playQueue(detail.tracks)
+            viewModelScope.launch { playerController.playQueue(detail.tracks) }
         }
     }
 
     fun playTrack(index: Int) {
         val detail = _detail.value ?: return
         if (index in detail.tracks.indices) {
-            playerController.playQueue(detail.tracks, index)
+            viewModelScope.launch { playerController.playQueue(detail.tracks, index) }
+        }
+    }
+
+    // 歌单列表页的"新建歌单"（不涉及收藏）
+    fun createPlaylist(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            runCatching { playlistRepository.createPlaylist(trimmed) }
+                .onSuccess { load() }
+                .onFailure {
+                    AppLogger.e(TAG, "创建歌单失败 name=$trimmed", it)
+                    _playlistsError.value = it.message ?: "创建失败"
+                }
         }
     }
 
@@ -167,8 +181,9 @@ class PlaylistViewModel(
                 if (add) playlistRepository.addTrack(playlistId, song.songId)
                 else playlistRepository.removeTrack(playlistId, song.songId)
             }
-            _collect.value = _collect.value?.copy(
-                items = _collect.value?.items?.map { item ->
+            val current = _collect.value ?: return@launch
+            _collect.value = current.copy(
+                items = current.items.map { item ->
                     if (item.playlistId == playlistId) {
                         if (result.isSuccess) {
                             val updated = if (add) {
