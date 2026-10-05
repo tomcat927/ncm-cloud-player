@@ -91,6 +91,8 @@ class PlayerController(
     private var currentIndexValue = -1
     private var progressJob: Job? = null
     private var lyricsJob: Job? = null
+    // 队列播放中连续取址失败的次数，用于跳歌防死循环；成功播放即清零
+    private var consecutiveFailures = 0
     // 歌词页可见时加密轮询间隔，行高亮与滚动才跟得上
     private var progressIntervalMs = 500L
     // 供卡拉OK逐帧插值：最近一次轮询的位置与时刻
@@ -195,6 +197,7 @@ class PlayerController(
         if (songs.isEmpty()) return
         queueList = songs
         originalQueue = songs
+        consecutiveFailures = 0
         currentIndexValue = startIndex.coerceIn(0, songs.lastIndex)
         if (_playMode.value == PlayMode.SHUFFLE) reshuffleQueue()
         publishQueue()
@@ -285,7 +288,17 @@ class PlayerController(
         val stream = runCatching { playbackRepository.getSongStream(song.songId, level) }
             .onFailure { AppLogger.e(TAG, "获取播放地址失败: ${song.songId}", it) }
             .getOrNull()
-            ?: throw IllegalStateException("获取播放地址失败")
+        if (stream == null) {
+            // 队列里取址失败（VIP/版权歌曲等）：自动跳下一首；整轮都失败才停止并报错
+            consecutiveFailures++
+            if (queueList.size > 1 && consecutiveFailures < queueList.size) {
+                AppLogger.i(TAG, "取址失败自动跳过: ${song.displayTitle} (${consecutiveFailures}/${queueList.size})")
+                skipToNext()
+                return
+            }
+            throw IllegalStateException("获取播放地址失败")
+        }
+        consecutiveFailures = 0
         val url = stream.url ?: throw IllegalStateException("获取播放地址失败")
         AppLogger.i(
             TAG,

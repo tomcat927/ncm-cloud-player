@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -54,6 +56,7 @@ import coil3.compose.AsyncImage
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.data.CloudDiskSummary
 import com.ncmcloud.player.domain.CloudSong
+import com.ncmcloud.player.ui.playlist.PlaylistViewModel
 import com.ncmcloud.player.ui.player.PlayerBar
 import org.koin.androidx.compose.koinViewModel
 import java.util.Locale
@@ -64,10 +67,13 @@ fun CloudScreen(
     onOpenSettings: () -> Unit,
     onOpenPlayerDetail: () -> Unit,
     onOpenPlayerQueue: () -> Unit,
+    onOpenPlaylists: () -> Unit,
 ) {
     val viewModel: CloudViewModel = koinViewModel()
+    val playlistViewModel: PlaylistViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val diskSummary by viewModel.diskSummary.collectAsState()
+    val collectState by playlistViewModel.collect.collectAsState()
     var query by remember { mutableStateOf("") }
 
     Scaffold(
@@ -80,6 +86,9 @@ fun CloudScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = onOpenPlaylists) {
+                        Icon(Icons.Filled.LibraryMusic, contentDescription = "歌单")
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Filled.Settings, contentDescription = "设置")
                     }
@@ -180,6 +189,10 @@ fun CloudScreen(
                                             AppLogger.i("UI", "点击:播放《${song.displayTitle}》")
                                             viewModel.play(song)
                                         },
+                                        onMoreClick = {
+                                            AppLogger.i("UI", "点击:歌曲更多《${song.displayTitle}》")
+                                            playlistViewModel.openCollect(song)
+                                        },
                                     )
                                 }
                                 item {
@@ -210,6 +223,13 @@ fun CloudScreen(
                 onOpenDetail = onOpenPlayerDetail,
                 onOpenQueue = onOpenPlayerQueue,
             )
+
+            collectState?.let { state ->
+                com.ncmcloud.player.ui.playlist.PlaylistCollectSheet(
+                    state = state,
+                    onDismiss = { playlistViewModel.closeCollect() },
+                )
+            }
         }
     }
 }
@@ -275,7 +295,11 @@ private fun formatGb(bytes: Long): String {
 }
 
 @Composable
-private fun CloudSongRow(song: CloudSong, onClick: () -> Unit) {
+private fun CloudSongRow(
+    song: CloudSong,
+    onClick: () -> Unit,
+    onMoreClick: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -305,6 +329,14 @@ private fun CloudSongRow(song: CloudSong, onClick: () -> Unit) {
             )
         }
         BitrateChip(bitrate = song.bitrate)
+        IconButton(onClick = onMoreClick) {
+            Icon(
+                Icons.Filled.MoreVert,
+                contentDescription = "更多操作",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
+            )
+        }
     }
 }
 

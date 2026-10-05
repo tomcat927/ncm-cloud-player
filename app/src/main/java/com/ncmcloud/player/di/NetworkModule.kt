@@ -16,6 +16,7 @@ import com.ncmcloud.player.core.network.crypto.XeapiKeyStoreImpl
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.feature.cloud.data.CloudApi
+import com.ncmcloud.player.feature.playlist.data.PlaylistApi
 import com.ncmcloud.player.core.player.data.PlaybackApi
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
@@ -83,6 +84,7 @@ val networkModule = module {
     single<NeteaseApiService> { get<Retrofit>().create(NeteaseApiService::class.java) }
     single<CloudApi> { get<Retrofit>().create(CloudApi::class.java) }
     single<PlaybackApi> { get<Retrofit>().create(PlaybackApi::class.java) }
+    single<PlaylistApi> { get<Retrofit>().create(PlaylistApi::class.java) }
 }
 
 val preferenceModule = module {
