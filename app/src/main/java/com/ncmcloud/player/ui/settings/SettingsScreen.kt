@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.FormatSize
@@ -86,6 +87,7 @@ fun SettingsScreen(
     val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(
         initial = SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
     )
+    val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
 
     Scaffold(
         topBar = {
@@ -112,6 +114,14 @@ fun SettingsScreen(
 
             item {
                 SettingsSection(title = "应用") {
+                    SettingsSwitchRow(
+                        icon = Icons.Filled.CloudDownload,
+                        title = "镜像加速更新下载",
+                        subtitle = "更新资源经公共镜像 gh-proxy.com 中转（国内直连），关闭后仅 GitHub 直连",
+                        checked = updatePreferMirror,
+                        onCheckedChange = { scope.launch { settingsPreferences.setUpdatePreferMirror(it) } },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     SettingsActionRow(
                         icon = Icons.Filled.BugReport,
                         title = "诊断日志",

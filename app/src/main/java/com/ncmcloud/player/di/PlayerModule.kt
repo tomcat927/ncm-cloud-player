@@ -9,5 +9,5 @@ import org.koin.dsl.module
 val playerModule = module {
     single { LyricsCache(androidContext()) }
     single { PlayerController(get(), get(), get(), get()) }
-    single { UpdateService(get()) }
+    single { UpdateService(get(), get()) }
 }

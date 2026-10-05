@@ -6,7 +6,9 @@ import android.net.Uri
 import androidx.core.content.FileProvider
 import com.ncmcloud.player.core.log.AppLogger
 import android.os.Build
+import com.ncmcloud.player.core.preferences.SettingsPreferences
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -31,7 +33,10 @@ data class UpdateInfo(
     val releaseNotes: String?,
 )
 
-class UpdateService(private val context: Context) {
+class UpdateService(
+    private val context: Context,
+    private val settingsPreferences: SettingsPreferences,
+) {
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
@@ -45,8 +50,9 @@ class UpdateService(private val context: Context) {
     private val apiUrl = "https://api.github.com/repos/$OWNER/$REPO/releases/latest"
 
     suspend fun checkForUpdate(): UpdateInfo? = withContext(Dispatchers.IO) {
+        val preferMirror = settingsPreferences.updatePreferMirror.first()
         val currentVersionCode = currentVersionCode()
-        val info = checkFromManifest() ?: checkFromGitHubApi()
+        val info = checkFromManifest(preferMirror) ?: checkFromGitHubApi()
         if (info == null) {
             AppLogger.i(TAG, "未获取到更新信息")
             null
@@ -61,21 +67,30 @@ class UpdateService(private val context: Context) {
         return if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
     }
 
-    private suspend fun checkFromManifest(): UpdateInfo? {
-        for (url in manifestUrls) {
+    private suspend fun checkFromManifest(preferMirror: Boolean): UpdateInfo? {
+        // 关闭镜像时清单也走直连；镜像开启时镜像源优先、直连兜底
+        val urls = if (preferMirror) manifestUrls else manifestUrls.reversed()
+        for (url in urls) {
             val body = readText(url) ?: continue
             val json = runCatching { JSONObject(body) }.getOrNull() ?: continue
             val versionCode = json.optLong("version_code", -1L)
             val apk = json.optString("apk")
             val githubApk = json.optString("github_apk")
             if (versionCode <= 0 || apk.isEmpty() || githubApk.isEmpty()) continue
+            // 镜像关闭时主备互换，下载与校验全部走 GitHub 直连
+            val (primary, secondary) = if (preferMirror) apk to githubApk else githubApk to apk
+            val (primaryChecksum, secondaryChecksum) = if (preferMirror) {
+                json.optString("apk_sha256") to json.optString("github_apk_sha256")
+            } else {
+                json.optString("github_apk_sha256") to json.optString("apk_sha256")
+            }
             return UpdateInfo(
                 tagName = json.optString("tag_name"),
                 versionCode = versionCode,
-                downloadUrl = apk,
-                fallbackDownloadUrl = githubApk,
-                checksumUrl = json.optString("apk_sha256"),
-                fallbackChecksumUrl = json.optString("github_apk_sha256"),
+                downloadUrl = primary,
+                fallbackDownloadUrl = secondary,
+                checksumUrl = primaryChecksum,
+                fallbackChecksumUrl = secondaryChecksum,
                 releaseUrl = json.optString("release_url"),
                 releaseNotes = json.optString("release_notes", null).takeIf { it.isNotBlank() },
             )
@@ -84,6 +99,7 @@ class UpdateService(private val context: Context) {
     }
 
     private suspend fun checkFromGitHubApi(): UpdateInfo? {
+        val preferMirror = settingsPreferences.updatePreferMirror.first()
         val body = readText(apiUrl, mapOf("Accept" to "application/vnd.github+json", "User-Agent" to REPO))
             ?: return null
         val json = runCatching { JSONObject(body) }.getOrNull() ?: return null
@@ -100,13 +116,23 @@ class UpdateService(private val context: Context) {
         }
         if (apkUrl.isEmpty()) return null
         val versionCode = versionCodeFromTag(tagName) ?: return null
+        val (primaryDownload, fallbackDownload) = if (preferMirror) {
+            "${PROXY_PREFIX}$apkUrl" to apkUrl
+        } else {
+            apkUrl to "${PROXY_PREFIX}$apkUrl"
+        }
+        val (primaryChecksum, fallbackChecksum) = if (preferMirror) {
+            "${PROXY_PREFIX}$checksumUrl" to checksumUrl
+        } else {
+            checksumUrl to "${PROXY_PREFIX}$checksumUrl"
+        }
         return UpdateInfo(
             tagName = tagName,
             versionCode = versionCode,
-            downloadUrl = "${PROXY_PREFIX}$apkUrl",
-            fallbackDownloadUrl = apkUrl,
-            checksumUrl = "${PROXY_PREFIX}$checksumUrl",
-            fallbackChecksumUrl = checksumUrl,
+            downloadUrl = primaryDownload,
+            fallbackDownloadUrl = fallbackDownload,
+            checksumUrl = primaryChecksum,
+            fallbackChecksumUrl = fallbackChecksum,
             releaseUrl = json.optString("html_url"),
             releaseNotes = json.optString("body", null).takeIf { it.isNotBlank() },
         )
@@ -121,7 +147,13 @@ class UpdateService(private val context: Context) {
         downloadTo(info.downloadUrl, file, onProgress) ?: downloadTo(info.fallbackDownloadUrl, file, onProgress)
             ?: throw IllegalStateException("APK 下载失败")
 
-        val expected = readChecksum(info.checksumUrl) ?: readChecksum(info.fallbackChecksumUrl)
+        val preferMirror = settingsPreferences.updatePreferMirror.first()
+        // 完整性：镜像下载的 APK 优先用 GitHub 直连的校验和验证（防镜像篡改），直连下载则用直连校验和
+        val expected = if (preferMirror) {
+            readChecksum(info.fallbackChecksumUrl) ?: readChecksum(info.checksumUrl)
+        } else {
+            readChecksum(info.checksumUrl) ?: readChecksum(info.fallbackChecksumUrl)
+        }
         AppLogger.i(TAG, "APK 下载结束: file=${file.absolutePath}, size=${file.length()}, checksumUrl=${info.checksumUrl}")
         if (expected != null) {
             val actual = sha256(file)

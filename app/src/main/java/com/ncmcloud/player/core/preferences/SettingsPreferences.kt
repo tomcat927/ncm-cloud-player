@@ -19,6 +19,7 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LYRIC_CACHE = booleanPreferencesKey("lyric_cache_enabled")
         private val KEY_LYRIC_TRANSLATION = booleanPreferencesKey("lyric_translation_enabled")
         private val KEY_LYRIC_FONT_SIZE = intPreferencesKey("lyric_font_size")
+        private val KEY_UPDATE_PREFER_MIRROR = booleanPreferencesKey("update_prefer_mirror")
 
         const val DEFAULT_LYRIC_FONT_SIZE = 20
     }
@@ -32,6 +33,9 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
     val lyricTranslationEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LYRIC_TRANSLATION] ?: true }
     // 歌词当前行字号（sp），其余行按固定差值缩小
     val lyricFontSize: Flow<Int> = dataStore.data.map { it[KEY_LYRIC_FONT_SIZE] ?: DEFAULT_LYRIC_FONT_SIZE }
+
+    // 更新资源（清单/APK/校验和）下载是否优先走公共镜像 gh-proxy.com（国内直连），关闭则仅 GitHub 直连
+    val updatePreferMirror: Flow<Boolean> = dataStore.data.map { it[KEY_UPDATE_PREFER_MIRROR] ?: true }
 
     suspend fun setUseRealIp(value: Boolean) {
         dataStore.edit { it[KEY_USE_REAL_IP] = value }
@@ -59,5 +63,9 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setLyricFontSize(value: Int) {
         dataStore.edit { it[KEY_LYRIC_FONT_SIZE] = value }
+    }
+
+    suspend fun setUpdatePreferMirror(value: Boolean) {
+        dataStore.edit { it[KEY_UPDATE_PREFER_MIRROR] = value }
     }
 }
