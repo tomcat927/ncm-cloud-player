@@ -350,7 +350,7 @@ fun PlayerDetailScreen(
 
                 Spacer(modifier = Modifier.height(9.dp))
                 Text(
-                    "${song.bitrate / 1000} kbps · ${formatFileSize(song.fileSize)} · 第 ${currentIndex + 1}/${queue.size} 首",
+                    "${song.bitrate} kbps · ${formatFileSize(song.fileSize)} · 第 ${currentIndex + 1}/${queue.size} 首",
                     fontSize = 12.sp,
                     color = ControlsInactive.copy(alpha = 0.82f),
                     maxLines = 1,

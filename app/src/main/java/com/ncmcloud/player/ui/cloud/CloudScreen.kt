@@ -309,6 +309,23 @@ private fun CloudSongRow(song: CloudSong, onClick: () -> Unit) {
 }
 
 @Composable
+private fun BitrateChip(bitrate: Int) {
+    // 云盘接口的 bitrate 单位已是 kbps（如 926 = 926kbps），不要再除以 1000
+    if (bitrate <= 0) return
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+    ) {
+        Text(
+            text = "${bitrate}k",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
+@Composable
 private fun SongCover(coverUrl: String, contentDescription: String) {
     Box(
         modifier = Modifier
@@ -331,20 +348,5 @@ private fun SongCover(coverUrl: String, contentDescription: String) {
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-    }
-}
-
-@Composable
-private fun BitrateChip(bitrate: Int) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-    ) {
-        Text(
-            text = "${bitrate / 1000}k",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-        )
     }
 }

@@ -86,7 +86,7 @@ fun SongInfoSheet(
             InfoRow("专辑", song.album.ifBlank { "未知专辑" })
             InfoRow("格式", formatLabel(song.fileName))
             InfoRow("时长", formatDuration(duration))
-            InfoRow("文件码率", if (song.bitrate > 0) "${song.bitrate / 1000} kbps" else "未知")
+            InfoRow("文件码率", if (song.bitrate > 0) "${song.bitrate} kbps" else "未知")
             InfoRow("文件大小", formatFileSize(song.fileSize))
             InfoRow("实际下发", actualStreamLabel(nowPlaying))
             Text(
