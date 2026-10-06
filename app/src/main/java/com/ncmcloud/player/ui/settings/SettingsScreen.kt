@@ -1,5 +1,7 @@
 package com.ncmcloud.player.ui.settings
 
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
@@ -40,6 +42,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -61,12 +64,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.data.AuthRepository
+import com.ncmcloud.player.data.QrRiskChallengeException
 import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
@@ -107,6 +112,7 @@ fun SettingsScreen(
     val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
 
     // 扫码确认器：扫描网页上的登录二维码，用本 App 登录态确认该网页的登录
+    val context = LocalContext.current
     val qrScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents?.trim()
         if (contents.isNullOrBlank()) return@rememberLauncherForActivityResult
@@ -122,10 +128,25 @@ fun SettingsScreen(
                     AppLogger.i("UI", "扫码确认成功")
                     snackbarHostState.showSnackbar("扫码确认成功，网页已登录")
                 }
-                        .onFailure {
-                            AppLogger.e("UI", "扫码确认失败", it)
-                            snackbarHostState.showSnackbar("扫码确认失败：${it.message}")
-                        }
+                .onFailure {
+                    if (it is QrRiskChallengeException) {
+                        // 网易风控：引导用户到官方验证页完成验证，然后重新扫码
+                        AppLogger.i("UI", "扫码触发安全验证，打开验证页: ${it.redirectUrl}")
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(it.redirectUrl))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        }.onFailure { e -> AppLogger.e("UI", "打开验证页失败", e) }
+                        snackbarHostState.showSnackbar(
+                            "检测到登录安全风险，请在打开的页面完成验证后重新扫码",
+                            SnackbarDuration.Long
+                        )
+                    } else {
+                        AppLogger.e("UI", "扫码确认失败", it)
+                        snackbarHostState.showSnackbar("扫码确认失败：${it.message}")
+                    }
+                }
         }
     }
 

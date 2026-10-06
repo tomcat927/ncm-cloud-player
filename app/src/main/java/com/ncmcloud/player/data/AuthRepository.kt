@@ -17,6 +17,12 @@ import kotlinx.coroutines.flow.first
 
 private const val QR_LOGIN_URL_PREFIX = "https://music.163.com/login?codekey="
 
+// 扫码确认触发网易风控（code=10004），需引导用户到官方验证页完成后重新扫码
+class QrRiskChallengeException(
+    val redirectUrl: String,
+    message: String,
+) : IllegalStateException(message)
+
 class AuthRepository(
     private val apiService: NeteaseApiService,
     private val userPreferences: UserPreferences,
@@ -43,11 +49,12 @@ class AuthRepository(
     suspend fun confirmQrLogin(key: String, clientTraceId: String): QrLoginConfirmResponse {
         val userid = currentUid()
         // 官方页对 type=1 的结果不阻断，失败也继续发起 type=2
-        runCatching {
+        val scanResp = runCatching {
             apiService.confirmQrLogin(
                 QrLoginConfirmRequest(key = key, type = 1, userid = userid, clientTraceId = clientTraceId)
             )
-        }
+        }.getOrNull()
+        scanResp?.let { maybeThrowRiskChallenge(it) }
         val resp = apiService.confirmQrLogin(
             QrLoginConfirmRequest(
                 key = key,
@@ -58,10 +65,19 @@ class AuthRepository(
                 device = DeviceInfo.model,
             )
         )
+        maybeThrowRiskChallenge(resp)
         if (!resp.isSuccess) {
             throw IllegalStateException(resp.message ?: "扫码确认失败 code=${resp.code}")
         }
         return resp
+    }
+
+    // 风控响应形如 {"code":10004,"message":"当前登录存在安全风险…","redirectUrl":"https://st.music.163.com/..."}
+    // 官方页面对此的处理是整页跳转到 redirectUrl 让用户完成验证，这里抛专用异常交 UI 打开浏览器
+    private fun maybeThrowRiskChallenge(resp: QrLoginConfirmResponse) {
+        if (resp.code == 10004 && !resp.redirectUrl.isNullOrBlank()) {
+            throw QrRiskChallengeException(resp.redirectUrl, resp.message ?: "当前登录存在安全风险")
+        }
     }
 
     // 扫码方 uid：优先取本地缓存的资料，缺失时现拉一次账号信息兜底
