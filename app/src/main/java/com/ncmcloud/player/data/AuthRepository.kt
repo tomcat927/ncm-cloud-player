@@ -81,6 +81,10 @@ class AuthRepository(
         userPreferences.clearUserProfile()
     }
 
+    // 拉取并保存账号资料（含 uid）。登录时资料拉取失败会留下"有 cookie 无 uid"的状态，
+    // 需要 uid 的功能（如服务器端歌单）可调用此方法现补
+    suspend fun refreshProfile() = fetchAndSaveProfile()
+
     private suspend fun fetchAndSaveProfile() {
         val account = apiService.getAccountInfo()
         if (account.code != 200) throw IllegalStateException("账号信息接口返回 code=${account.code}")

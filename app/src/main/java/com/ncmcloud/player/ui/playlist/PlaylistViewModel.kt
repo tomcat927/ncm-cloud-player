@@ -2,8 +2,9 @@ package com.ncmcloud.player.ui.playlist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.auth.UserPreferences
+import com.ncmcloud.player.core.log.AppLogger
+import com.ncmcloud.player.data.AuthRepository
 import com.ncmcloud.player.data.PlaylistRepository
 import com.ncmcloud.player.domain.CloudSong
 import com.ncmcloud.player.feature.playlist.data.NeteaseTrack
@@ -48,6 +49,7 @@ data class CollectState(
 
 class PlaylistViewModel(
     private val playlistRepository: PlaylistRepository,
+    private val authRepository: AuthRepository,
     private val userPreferences: UserPreferences,
     private val playerController: PlayerController,
 ) : ViewModel() {
@@ -86,11 +88,18 @@ class PlaylistViewModel(
     }
 
     private suspend fun fetchPlaylists(): List<PlaylistUiItem> {
-        val uid = userPreferences.userProfile.first()?.uid
-            ?: throw IllegalStateException("未获取到用户信息")
+        val uid = resolveUid()
         return playlistRepository.getMyPlaylists(uid).map {
             PlaylistUiItem(id = it.id, name = it.name, trackCount = it.trackCount)
         }
+    }
+
+    // cookie 在但用户资料缺失（登录时资料拉取失败）时现补一次账号信息
+    private suspend fun resolveUid(): Long {
+        userPreferences.userProfile.first()?.uid?.takeIf { it > 0 }?.let { return it }
+        authRepository.refreshProfile()
+        return userPreferences.userProfile.first()?.uid
+            ?: throw IllegalStateException("未获取到用户信息")
     }
 
     fun openDetail(id: Long) {
