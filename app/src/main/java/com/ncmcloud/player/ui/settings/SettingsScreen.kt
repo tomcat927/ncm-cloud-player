@@ -66,7 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.BuildConfig
-import com.ncmcloud.player.core.auth.AuthRepository
+import com.ncmcloud.player.data.AuthRepository
 import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
