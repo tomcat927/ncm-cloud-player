@@ -1,7 +1,5 @@
 package com.ncmcloud.player.ui.settings
 
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
@@ -64,7 +62,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -113,7 +110,7 @@ fun SettingsScreen(
     val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
 
     // 扫码确认器：扫描网页上的登录二维码，用本 App 登录态确认该网页的登录
-    val context = LocalContext.current
+    var riskVerifyUrl by remember { mutableStateOf<String?>(null) }
     val qrScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
         val contents = result.contents?.trim()
         if (contents.isNullOrBlank()) return@rememberLauncherForActivityResult
@@ -131,16 +128,12 @@ fun SettingsScreen(
                 }
                 .onFailure {
                     if (it is QrRiskChallengeException) {
-                        // 网易风控：引导用户到官方验证页完成验证，然后重新扫码
-                        AppLogger.i("UI", "扫码触发安全验证，打开验证页: ${it.redirectUrl}")
-                        runCatching {
-                            context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse(it.redirectUrl))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            )
-                        }.onFailure { e -> AppLogger.e("UI", "打开验证页失败", e) }
+                        // 网易风控：系统浏览器裸开验证页会因缺少登录态被判「风险设备」，
+                        // 改用内置 WebView（注入 App Cookie，等价官方 App 内置 WebView 上下文）
+                        AppLogger.i("UI", "扫码触发安全验证，打开内置验证页: ${it.redirectUrl}")
+                        riskVerifyUrl = it.redirectUrl
                         snackbarHostState.showSnackbar(
-                            "检测到登录安全风险，请在打开的页面完成验证后重新扫码",
+                            "检测到登录安全风险，请在验证页完成验证后重新扫码",
                             duration = SnackbarDuration.Long
                         )
                     } else {
@@ -149,6 +142,10 @@ fun SettingsScreen(
                     }
                 }
         }
+    }
+
+    riskVerifyUrl?.let { url ->
+        RiskVerifyScreen(verifyUrl = url, onClose = { riskVerifyUrl = null })
     }
 
     Scaffold(
