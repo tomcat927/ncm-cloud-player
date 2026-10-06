@@ -36,8 +36,11 @@ interface NeteaseApiService {
     ): Response<QrCheckResponse>
 
     // 扫码确认：本 App（已登录）作为扫码方，确认外部（如无痕网页）二维码的登录请求。
-    // 端点未经官方文档证实（社区资料 /eapi/login/qrcode/confirm），真机验证后如有出入在此调整
-    @POST("/eapi/login/qrcode/confirm")
+    // 2026-10 真机验证：旧路径 /eapi/login/qrcode/confirm 已不存在（服务端返回"接口未找到"）。
+    // 现行端点取自官方扫码确认页（music.163.com/st/platform/scanlogin）网络层：
+    // api/login/qrcode/server/login，type=1 上报已扫描 / type=2 确认授权 / type=3 拒绝，
+    // userid 为扫码方账号 uid，clientTraceId 为本次登录事件链路 id。
+    @POST("/eapi/login/qrcode/server/login")
     suspend fun confirmQrLogin(
         @Body body: QrLoginConfirmRequest
     ): QrLoginConfirmResponse
@@ -116,13 +119,24 @@ data class QrCheckResponse(
 
 // ======================= 扫码确认（本 App 作为已登录扫码方） =======================
 
+// 对齐官方扫码确认页的实际请求字段；brand/device/envType 在 type=2 时随请求上报
 @Serializable
-data class QrLoginConfirmRequest(val key: String)
+data class QrLoginConfirmRequest(
+    val key: String,
+    val type: Int = 2,
+    val userid: Long = 0,
+    val clientTraceId: String = "",
+    val isEd: Boolean = true,
+    val brand: String = "",
+    val device: String = "",
+    val envType: String = "",
+)
 
 @Serializable
 data class QrLoginConfirmResponse(
     val code: Int = 0,
     val message: String? = null,
+    val redirectUrl: String? = null,
 ) {
     val isSuccess: Boolean get() = code == 200
 }

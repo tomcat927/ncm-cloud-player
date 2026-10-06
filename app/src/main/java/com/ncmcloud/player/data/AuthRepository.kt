@@ -12,6 +12,8 @@ import com.ncmcloud.player.core.api.QrLoginConfirmRequest
 import com.ncmcloud.player.core.api.QrLoginConfirmResponse
 import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.auth.UserProfile
+import com.ncmcloud.player.core.network.DeviceInfo
+import kotlinx.coroutines.flow.first
 
 private const val QR_LOGIN_URL_PREFIX = "https://music.163.com/login?codekey="
 
@@ -35,13 +37,32 @@ class AuthRepository(
     fun qrLoginUrl(key: String): String = QR_LOGIN_URL_PREFIX + key
 
     // 本 App 作为已登录扫码方，确认外部（无痕网页等）二维码的登录请求。
-    // 确认接口未经官方文档证实（社区资料 /eapi/login/qrcode/confirm），真机验证后如有出入在此调整。
-    suspend fun confirmQrLogin(key: String): QrLoginConfirmResponse {
-        val resp = apiService.confirmQrLogin(QrLoginConfirmRequest(key = key))
+    // 走官方确认页同款 server/login 接口（type=2 确认授权）；userid 必须是扫码方账号 uid。
+    // [clientTraceId] 优先取二维码 URL 里的 login_traceId，没有则由调用方生成随机 UUID。
+    suspend fun confirmQrLogin(key: String, clientTraceId: String): QrLoginConfirmResponse {
+        val userid = currentUid()
+        val resp = apiService.confirmQrLogin(
+            QrLoginConfirmRequest(
+                key = key,
+                type = 2,
+                userid = userid,
+                clientTraceId = clientTraceId,
+                brand = DeviceInfo.brand,
+                device = DeviceInfo.model,
+            )
+        )
         if (!resp.isSuccess) {
             throw IllegalStateException(resp.message ?: "扫码确认失败 code=${resp.code}")
         }
         return resp
+    }
+
+    // 扫码方 uid：优先取本地缓存的资料，缺失时现拉一次账号信息兜底
+    private suspend fun currentUid(): Long {
+        userPreferences.userProfile.first()?.let { return it.uid }
+        val account = apiService.getAccountInfo()
+        if (account.code == 200) return account.account?.id ?: 0
+        return 0
     }
 
     suspend fun sendCaptcha(phone: String, ctcode: String = "86"): CaptchaSentResponse {

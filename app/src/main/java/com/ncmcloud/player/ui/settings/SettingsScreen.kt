@@ -77,6 +77,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.context.GlobalContext
+import java.util.UUID
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,12 +108,16 @@ fun SettingsScreen(
 
     // 扫码确认器：扫描网页上的登录二维码，用本 App 登录态确认该网页的登录
     val qrScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
-        val key = result.contents?.trim()
-        if (key.isNullOrBlank()) return@rememberLauncherForActivityResult
+        val contents = result.contents?.trim()
+        if (contents.isNullOrBlank()) return@rememberLauncherForActivityResult
+        // 二维码内容可能是裸 unikey，也可能是 URL（login?codekey=xxx 或 st/platform/scanlogin?codekey=xxx&login_traceId=...）
+        val codekey = Regex("codekey=([0-9a-zA-Z-]+)").find(contents)?.groupValues?.get(1) ?: contents
+        val traceId = Regex("([?&])login_traceId=([^&]+)").find(contents)?.groupValues?.get(2)
+            ?: UUID.randomUUID().toString()
         AppLogger.i("UI", "扫码成功，准备确认登录")
         scope.launch {
             snackbarHostState.showSnackbar("正在确认扫码登录…")
-            runCatching { authRepository.confirmQrLogin(key) }
+            runCatching { authRepository.confirmQrLogin(codekey, traceId) }
                 .onSuccess {
                     AppLogger.i("UI", "扫码确认成功")
                     snackbarHostState.showSnackbar("扫码确认成功，网页已登录")
