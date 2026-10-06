@@ -23,6 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
@@ -74,7 +77,10 @@ fun PlaylistScreen(onClose: () -> Unit) {
     val playlists by viewModel.playlists.collectAsState()
     val playlistsLoading by viewModel.playlistsLoading.collectAsState()
     val playlistsError by viewModel.playlistsError.collectAsState()
+    val detailMessage by viewModel.detailMessage.collectAsState()
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     BackHandler(enabled = detail != null) { viewModel.closeDetail() }
 
@@ -87,6 +93,16 @@ fun PlaylistScreen(onClose: () -> Unit) {
                         if (detail != null) viewModel.closeDetail() else onClose()
                     }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                actions = {
+                    if (detail != null) {
+                        IconButton(onClick = { showRenameDialog = true }) {
+                            Icon(Icons.Filled.Edit, contentDescription = "重命名歌单")
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "删除歌单")
+                        }
                     }
                 },
             )
@@ -179,6 +195,51 @@ fun PlaylistScreen(onClose: () -> Unit) {
             },
         )
     }
+
+    if (showRenameDialog) {
+        var newName by remember { mutableStateOf(detail?.name.orEmpty()) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("重命名歌单") },
+            text = {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    placeholder = { Text("歌单名") },
+                    singleLine = true,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRenameDialog = false
+                        viewModel.renamePlaylist(newName)
+                    },
+                    enabled = newName.isNotBlank(),
+                ) { Text("保存") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("取消") }
+            },
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("删除歌单") },
+            text = { Text("删除歌单《${detail?.name}》？歌曲仍会保留在云盘中。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showDeleteConfirm = false
+                    viewModel.deletePlaylist()
+                }) { Text("删除", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
+            },
+        )
+    }
 }
 
 @Composable
@@ -190,6 +251,15 @@ private fun PlaylistDetailContent(
     val playerController = remember { GlobalContext.get().get<com.ncmcloud.player.playback.PlayerController>() }
     val nowPlaying by playerController.nowPlaying.collectAsState()
     val loading by viewModel.detailLoading.collectAsState()
+    val message by viewModel.detailMessage.collectAsState()
+
+    // 操作结果提示 2.5 秒后自动消失
+    LaunchedEffect(message) {
+        if (message != null) {
+            delay(2500)
+            viewModel.clearDetailMessage()
+        }
+    }
 
     Box(modifier = modifier) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -205,6 +275,14 @@ private fun PlaylistDetailContent(
                 Icon(Icons.Filled.PlayArrow, contentDescription = null)
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("播放全部（${detail.tracks.size} 首）")
+            }
+            message?.let {
+                Text(
+                    it,
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
             }
             if (loading) {
                 Box(modifier = Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
@@ -244,6 +322,18 @@ private fun PlaylistDetailContent(
                         }
                         if (isCurrent) {
                             Text("播放中", style = MaterialTheme.typography.labelSmall)
+                        } else {
+                            IconButton(onClick = {
+                                AppLogger.i("UI", "点击:歌单详情-移除《${song.displayTitle}》")
+                                viewModel.removeTrack(index)
+                            }, modifier = Modifier.size(32.dp)) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "从歌单移除",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         }
                     }
                 }

@@ -69,6 +69,10 @@ class PlaylistViewModel(
     private val _detailLoading = MutableStateFlow(false)
     val detailLoading: StateFlow<Boolean> = _detailLoading.asStateFlow()
 
+    // 详情页操作（改名/删除/移除曲目）的结果提示
+    private val _detailMessage = MutableStateFlow<String?>(null)
+    val detailMessage: StateFlow<String?> = _detailMessage.asStateFlow()
+
     private val _collect = MutableStateFlow<CollectState?>(null)
     val collect: StateFlow<CollectState?> = _collect.asStateFlow()
 
@@ -133,6 +137,65 @@ class PlaylistViewModel(
         val detail = _detail.value ?: return
         if (index in detail.tracks.indices) {
             viewModelScope.launch { playerController.playQueue(detail.tracks, index) }
+        }
+    }
+
+    fun renamePlaylist(name: String) {
+        val detail = _detail.value ?: return
+        val trimmed = name.trim()
+        if (trimmed.isEmpty() || trimmed == detail.name) return
+        viewModelScope.launch {
+            runCatching { playlistRepository.renamePlaylist(detail.id, trimmed) }
+                .onSuccess {
+                    _detail.value = detail.copy(name = trimmed)
+                    _playlists.value = _playlists.value.map {
+                        if (it.id == detail.id) it.copy(name = trimmed) else it
+                    }
+                    _detailMessage.value = "已重命名为《$trimmed》"
+                }
+                .onFailure {
+                    AppLogger.e(TAG, "重命名歌单失败 id=${detail.id}", it)
+                    _detailMessage.value = it.message ?: "重命名失败"
+                }
+        }
+    }
+
+    fun deletePlaylist() {
+        val detail = _detail.value ?: return
+        viewModelScope.launch {
+            runCatching { playlistRepository.deletePlaylist(detail.id) }
+                .onSuccess {
+                    AppLogger.i(TAG, "歌单已删除: ${detail.name}")
+                    playlistTrackCache.remove(detail.id)
+                    _playlists.value = _playlists.value.filterNot { it.id == detail.id }
+                    _detail.value = null
+                    _detailMessage.value = "歌单《${detail.name}》已删除"
+                }
+                .onFailure {
+                    AppLogger.e(TAG, "删除歌单失败 id=${detail.id}", it)
+                    _detailMessage.value = it.message ?: "删除失败"
+                }
+        }
+    }
+
+    fun removeTrack(index: Int) {
+        val detail = _detail.value ?: return
+        val song = detail.tracks.getOrNull(index) ?: return
+        viewModelScope.launch {
+            runCatching { playlistRepository.removeTrack(detail.id, song.songId) }
+                .onSuccess {
+                    val updated = detail.copy(tracks = detail.tracks.filterIndexed { i, _ -> i != index })
+                    _detail.value = updated
+                    _playlists.value = _playlists.value.map {
+                        if (it.id == detail.id) it.copy(trackCount = updated.tracks.size) else it
+                    }
+                    playlistTrackCache[detail.id] = playlistTrackCache[detail.id].orEmpty() - song.songId
+                    _detailMessage.value = "已从歌单移除《${song.displayTitle}》"
+                }
+                .onFailure {
+                    AppLogger.e(TAG, "移除歌曲失败 pid=${detail.id} songId=${song.songId}", it)
+                    _detailMessage.value = it.message ?: "移除失败"
+                }
         }
     }
 
@@ -246,6 +309,10 @@ class PlaylistViewModel(
 
     fun closeCollect() {
         _collect.value = null
+    }
+
+    fun clearDetailMessage() {
+        _detailMessage.value = null
     }
 
     // 云盘歌曲删除/改名后歌单快照会过期，外部通知失效清空缓存

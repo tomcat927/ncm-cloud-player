@@ -33,6 +33,37 @@ interface PlaylistApi {
     suspend fun createPlaylist(
         @Body body: PlaylistCreateRequest
     ): PlaylistCreateResponse
+
+    // 歌单重命名
+    @POST("/eapi/playlist/update/name")
+    suspend fun updatePlaylistName(
+        @Body body: PlaylistUpdateNameRequest
+    ): PlaylistUpdateNameResponse
+
+    // 删除歌单（ids 为 JSON 数组字符串，支持批量）
+    @POST("/weapi/playlist/remove")
+    suspend fun deletePlaylist(
+        @Body body: PlaylistDeleteRequest
+    ): PlaylistDeleteResponse
+}
+
+@Serializable
+data class PlaylistUpdateNameRequest(
+    val id: Long,
+    val name: String,
+)
+
+@Serializable
+data class PlaylistUpdateNameResponse(val code: Int = 0) {
+    val isSuccess: Boolean get() = code == 200
+}
+
+@Serializable
+data class PlaylistDeleteRequest(val ids: String)
+
+@Serializable
+data class PlaylistDeleteResponse(val code: Int = 0) {
+    val isSuccess: Boolean get() = code == 200
 }
 
 @Serializable

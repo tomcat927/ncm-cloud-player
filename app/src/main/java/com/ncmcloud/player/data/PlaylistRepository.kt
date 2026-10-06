@@ -3,8 +3,10 @@ package com.ncmcloud.player.data
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.feature.playlist.data.PlaylistApi
 import com.ncmcloud.player.feature.playlist.data.PlaylistCreateRequest
+import com.ncmcloud.player.feature.playlist.data.PlaylistDeleteRequest
 import com.ncmcloud.player.feature.playlist.data.PlaylistDetailRequest
 import com.ncmcloud.player.feature.playlist.data.PlaylistTracksRequest
+import com.ncmcloud.player.feature.playlist.data.PlaylistUpdateNameRequest
 import com.ncmcloud.player.feature.playlist.data.UserPlaylistsRequest
 
 private const val TAG = "PlaylistRepository"
@@ -42,6 +44,18 @@ class PlaylistRepository(private val playlistApi: PlaylistApi) {
         val resp = playlistApi.createPlaylist(PlaylistCreateRequest(name = name))
         if (!resp.isSuccess) throw IllegalStateException("创建歌单失败 code=${resp.code}")
         return resp.id
+    }
+
+    suspend fun renamePlaylist(id: Long, name: String) {
+        val resp = playlistApi.updatePlaylistName(
+            PlaylistUpdateNameRequest(id = id, name = name)
+        )
+        if (!resp.isSuccess) throw IllegalStateException("重命名失败 code=${resp.code}")
+    }
+
+    suspend fun deletePlaylist(id: Long) {
+        val resp = playlistApi.deletePlaylist(PlaylistDeleteRequest(ids = "[$id]"))
+        if (!resp.isSuccess) throw IllegalStateException("删除歌单失败 code=${resp.code}")
     }
 
     private suspend fun manipulate(op: String, playlistId: Long, songId: Long) {
