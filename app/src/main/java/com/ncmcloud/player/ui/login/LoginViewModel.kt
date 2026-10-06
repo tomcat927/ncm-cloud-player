@@ -153,10 +153,17 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
         }
         viewModelScope.launch {
             _smsState.value = SmsLoginState.Sending
+            AppLogger.i(TAG, "验证码发送: ${phone.masked()}")
             _smsState.value = runCatching { authRepository.sendCaptcha(phone) }
                 .fold(
-                    onSuccess = { SmsLoginState.CodeSent },
-                    onFailure = { SmsLoginState.Error(it.message ?: "验证码发送失败") },
+                    onSuccess = {
+                        AppLogger.i(TAG, "验证码发送成功: ${phone.masked()}")
+                        SmsLoginState.CodeSent
+                    },
+                    onFailure = {
+                        AppLogger.e(TAG, "验证码发送失败: ${phone.masked()}", it)
+                        SmsLoginState.Error(it.message ?: "验证码发送失败")
+                    },
                 )
         }
     }
@@ -168,16 +175,27 @@ class LoginViewModel(private val authRepository: AuthRepository) : ViewModel() {
         }
         viewModelScope.launch {
             _smsState.value = SmsLoginState.LoggingIn
+            AppLogger.i(TAG, "短信登录: ${phone.masked()}, 验证码长度=${captcha.length}")
             _smsState.value = runCatching { authRepository.loginWithCaptcha(phone, captcha) }
                 .fold(
-                    onSuccess = { SmsLoginState.CodeSent },
-                    onFailure = { SmsLoginState.Error(it.message ?: "登录失败") },
+                    onSuccess = {
+                        AppLogger.i(TAG, "短信登录成功: ${phone.masked()}")
+                        _state.value = LoginState.Success
+                        SmsLoginState.CodeSent
+                    },
+                    onFailure = {
+                        AppLogger.e(TAG, "短信登录失败: ${phone.masked()}", it)
+                        SmsLoginState.Error(it.message ?: "登录失败")
+                    },
                 )
             if (_smsState.value is SmsLoginState.CodeSent) {
                 _state.value = LoginState.Success
             }
         }
     }
+
+    private fun String.masked(): String =
+        if (length >= 7) take(3) + "****" + takeLast(4) else "***"
 
     fun resetSmsState() {
         _smsState.value = SmsLoginState.Idle

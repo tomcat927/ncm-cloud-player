@@ -2,11 +2,15 @@ package com.ncmcloud.player.ui.login
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.ncmcloud.player.core.log.AppLogger
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +38,8 @@ import com.ncmcloud.player.core.network.RealIpProvider
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import kotlinx.coroutines.flow.first
 import org.koin.core.context.GlobalContext
+
+private const val TAG = "WebViewLogin"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -92,7 +98,15 @@ fun WebViewLoginScreen(
                             flush()
                         }
                         setBackgroundColor(android.graphics.Color.parseColor("#F5F5F7"))
-                        webChromeClient = WebChromeClient()
+                        webChromeClient = object : WebChromeClient() {
+                            // 网页内部的登录失败（验证码/风控）通常会在控制台留下线索
+                            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                consoleMessage?.let {
+                                    AppLogger.i(TAG, "[网页控制台] ${it.message()} @${it.sourceId()?.substringAfterLast('/')}:${it.lineNumber()}")
+                                }
+                                return super.onConsoleMessage(consoleMessage)
+                            }
+                        }
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
@@ -102,12 +116,46 @@ fun WebViewLoginScreen(
                             userAgentString = baseUA
                         }
                         webViewClient = object : WebViewClient() {
+                            // 网页自己的登录请求（验证码/短信登录）不走 App 网络层，这里记录 URL 用于定位失败步骤
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                            ): WebResourceResponse? {
+                                request?.let { req ->
+                                    val url = req.url.toString()
+                                    if (req.method == "POST" && url.contains("music.163.com")) {
+                                        AppLogger.i(TAG, "[网页请求] POST ${req.url.encodedPath}")
+                                    }
+                                }
+                                return null
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                errorResponse: WebResourceResponse?,
+                            ) {
+                                AppLogger.w(TAG, "[网页] HTTP错误: ${request?.url} code=${errorResponse?.statusCode}")
+                                super.onReceivedHttpError(view, request, errorResponse)
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                error: WebResourceError?,
+                            ) {
+                                AppLogger.w(TAG, "[网页] 加载错误: ${request?.url} ${error?.description}")
+                                super.onReceivedError(view, request, error)
+                            }
+
                             override fun onPageFinished(view: WebView?, url: String?) {
+                                AppLogger.i(TAG, "[网页] 加载完成: $url")
                                 checkCookies(onLoginSuccess)
                                 isLoading = false
                             }
 
                             override fun doUpdateVisitedHistory(view: WebView?, url: String?, isReload: Boolean) {
+                                AppLogger.i(TAG, "[网页] 导航: $url")
                                 checkCookies(onLoginSuccess)
                             }
 

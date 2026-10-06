@@ -46,7 +46,7 @@ class AuthRepository(
 
     suspend fun sendCaptcha(phone: String, ctcode: String = "86"): CaptchaSentResponse {
         val resp = apiService.sendCaptcha(CaptchaSentRequest(cellphone = phone, ctcode = ctcode))
-        if (!resp.isSuccess) throw IllegalStateException("验证码发送失败 code=${resp.code}")
+        if (!resp.isSuccess) throw IllegalStateException("验证码发送失败 code=${resp.code} ${resp.description.orEmpty()}")
         return resp
     }
 
