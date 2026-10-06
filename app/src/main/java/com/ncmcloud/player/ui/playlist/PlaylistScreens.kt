@@ -82,6 +82,8 @@ fun PlaylistScreen(onClose: () -> Unit) {
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) { viewModel.load() }
+
     BackHandler(enabled = detail != null) { viewModel.closeDetail() }
 
     Scaffold(

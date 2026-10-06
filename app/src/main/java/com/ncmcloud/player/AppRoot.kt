@@ -57,10 +57,10 @@ fun AppRoot() {
         showPlayerDetail = false
     }
 
-    LaunchedEffect(showLogs, showSettings, showPlayerDetail, showPlayerQueue) {
+    LaunchedEffect(showLogs, showSettings, showPlaylists, showPlayerDetail, showPlayerQueue) {
         AppLogger.i(
             "Nav",
-            "页面状态: 日志页=$showLogs 设置页=$showSettings 详情页=$showPlayerDetail 队列=$showPlayerQueue",
+            "页面状态: 日志页=$showLogs 设置页=$showSettings 歌单页=$showPlaylists 详情页=$showPlayerDetail 队列=$showPlayerQueue",
         )
     }
 
