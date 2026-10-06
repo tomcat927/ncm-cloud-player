@@ -76,6 +76,7 @@ import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.ui.cloud.CloudViewModel
+import com.ncmcloud.player.ui.scan.PortraitCaptureActivity
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.flow.first
@@ -213,6 +214,9 @@ fun SettingsScreen(
                                     setDesiredBarcodeFormats(ScanOptions.QR_CODE)
                                     setPrompt("对准网页上的登录二维码")
                                     setBeepEnabled(false)
+                                    // 库默认锁横屏，竖屏扫码需自定义 CaptureActivity + 解锁方向
+                                    setOrientationLocked(false)
+                                    setCaptureActivity(PortraitCaptureActivity::class.java)
                                 },
                             )
                         },
