@@ -1,8 +1,13 @@
 package com.ncmcloud.player.ui.update
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -11,15 +16,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.ncmcloud.player.BuildConfig
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 
 @Composable
@@ -61,14 +71,29 @@ fun UpdateDialog() {
         }
 
         is UpdateState.NoUpdate -> {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismiss() },
-                title = { Text("已是最新版本") },
-                text = { Text("当前版本 ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})，已是最新。") },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.dismiss() }) { Text("关闭") }
-                },
-            )
+            // 已是最新版本：顶部短暂提示后自动消失，无需点击关闭
+            LaunchedEffect(Unit) {
+                delay(2000)
+                viewModel.dismiss()
+            }
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 72.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.62f))
+                        .padding(horizontal = 18.dp, vertical = 8.dp),
+                ) {
+                    Text(
+                        "已是最新版本 ${BuildConfig.VERSION_NAME}",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
         }
 
         is UpdateState.Downloading -> {
