@@ -1,6 +1,7 @@
 package com.ncmcloud.player.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -22,10 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material.icons.filled.SystemUpdateAlt
@@ -37,6 +40,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -55,13 +60,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ncmcloud.player.BuildConfig
+import com.ncmcloud.player.core.auth.AuthRepository
+import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.ui.cloud.CloudViewModel
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.context.GlobalContext
@@ -82,11 +94,35 @@ fun SettingsScreen(
 
     val settingsPreferences = remember { GlobalContext.get().get<SettingsPreferences>() }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val clipboard = LocalClipboardManager.current
+    val authRepository = remember { GlobalContext.get().get<AuthRepository>() }
+    val userPreferences = remember { GlobalContext.get().get<UserPreferences>() }
     val lyricCacheEnabled by settingsPreferences.lyricCacheEnabled.collectAsState(initial = true)
     val lyricTranslationEnabled by settingsPreferences.lyricTranslationEnabled.collectAsState(initial = true)
     val lyricFontSize by settingsPreferences.lyricFontSize.collectAsState(
         initial = SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
     )
+    val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
+
+    // 扫码确认器：扫描网页上的登录二维码，用本 App 登录态确认该网页的登录
+    val qrScanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val key = result.contents?.trim()
+        if (key.isNullOrBlank()) return@rememberLauncherForActivityResult
+        AppLogger.i("UI", "扫码成功，准备确认登录")
+        scope.launch {
+            snackbarHostState.showSnackbar("正在确认扫码登录…")
+            runCatching { authRepository.confirmQrLogin(key) }
+                .onSuccess {
+                    AppLogger.i("UI", "扫码确认成功")
+                    snackbarHostState.showSnackbar("扫码确认成功，网页已登录")
+                }
+                .onFailure {
+                    AppLogger.e("UI", "扫码确认失败", it)
+                    snackbarHostState.showSnackbar("扫码确认失败：${it.message}")
+                }
+        }
+    }
     val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
 
     Scaffold(
@@ -100,6 +136,7 @@ fun SettingsScreen(
                 },
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -120,6 +157,40 @@ fun SettingsScreen(
                         subtitle = "更新资源经公共镜像 gh-proxy.com 中转（国内直连），关闭后仅 GitHub 直连",
                         checked = updatePreferMirror,
                         onCheckedChange = { scope.launch { settingsPreferences.setUpdatePreferMirror(it) } },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    SettingsActionRow(
+                        icon = Icons.Filled.ContentCopy,
+                        title = "导出登录凭证",
+                        subtitle = "复制完整 Cookie，用于脚本或网页登录",
+                        onClick = {
+                            AppLogger.i("UI", "点击:设置-导出登录凭证")
+                            scope.launch {
+                                val cookie = userPreferences.cookies.first()
+                                if (cookie.isNullOrBlank()) {
+                                    snackbarHostState.showSnackbar("未获取到登录凭证")
+                                } else {
+                                    clipboard.setText(AnnotatedString(cookie))
+                                    snackbarHostState.showSnackbar("登录凭证已复制到剪贴板")
+                                }
+                            }
+                        },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    SettingsActionRow(
+                        icon = Icons.Filled.QrCodeScanner,
+                        title = "扫码登录其他设备",
+                        subtitle = "扫描网页上的登录二维码，本 App 确认登录",
+                        onClick = {
+                            AppLogger.i("UI", "点击:设置-扫码登录其他设备")
+                            qrScanLauncher.launch(
+                                ScanOptions().apply {
+                                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                    setPrompt("对准网页上的登录二维码")
+                                    setBeepEnabled(false)
+                                },
+                            )
+                        },
                     )
                     HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     SettingsActionRow(

@@ -126,6 +126,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.bouncycastle)
     implementation(libs.zxing.core)
+    implementation(libs.zxing.android.embedded)
 
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.compose.ui.tooling)

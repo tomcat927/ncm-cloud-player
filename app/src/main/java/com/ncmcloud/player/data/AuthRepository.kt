@@ -8,6 +8,8 @@ import com.ncmcloud.player.core.api.NeteaseApiService
 import com.ncmcloud.player.core.api.QrCheckRequest
 import com.ncmcloud.player.core.api.QrCheckResponse
 import com.ncmcloud.player.core.api.QrKeyResponse
+import com.ncmcloud.player.core.api.QrLoginConfirmRequest
+import com.ncmcloud.player.core.api.QrLoginConfirmResponse
 import com.ncmcloud.player.core.auth.UserPreferences
 import com.ncmcloud.player.core.auth.UserProfile
 
@@ -31,6 +33,16 @@ class AuthRepository(
     }
 
     fun qrLoginUrl(key: String): String = QR_LOGIN_URL_PREFIX + key
+
+    // 本 App 作为已登录扫码方，确认外部（无痕网页等）二维码的登录请求。
+    // 确认接口未经官方文档证实（社区资料 /eapi/login/qrcode/confirm），真机验证后如有出入在此调整。
+    suspend fun confirmQrLogin(key: String): QrLoginConfirmResponse {
+        val resp = apiService.confirmQrLogin(QrLoginConfirmRequest(key = key))
+        if (!resp.isSuccess) {
+            throw IllegalStateException(resp.message ?: "扫码确认失败 code=${resp.code}")
+        }
+        return resp
+    }
 
     suspend fun sendCaptcha(phone: String, ctcode: String = "86"): CaptchaSentResponse {
         val resp = apiService.sendCaptcha(CaptchaSentRequest(cellphone = phone, ctcode = ctcode))

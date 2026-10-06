@@ -35,6 +35,13 @@ interface NeteaseApiService {
         @Body body: QrCheckRequest
     ): Response<QrCheckResponse>
 
+    // 扫码确认：本 App（已登录）作为扫码方，确认外部（如无痕网页）二维码的登录请求。
+    // 端点未经官方文档证实（社区资料 /eapi/login/qrcode/confirm），真机验证后如有出入在此调整
+    @POST("/eapi/login/qrcode/confirm")
+    suspend fun confirmQrLogin(
+        @Body body: QrLoginConfirmRequest
+    ): QrLoginConfirmResponse
+}
         // 发送短信验证码 v1（eapi）
     @POST("/eapi/middle/captcha/sent/v1")
     suspend fun sendCaptcha(
@@ -106,6 +113,19 @@ data class QrCheckResponse(
     @Transient
     val cookies: String? = null
 )
+
+// ======================= 扫码确认（本 App 作为已登录扫码方） =======================
+
+@Serializable
+data class QrLoginConfirmRequest(val key: String)
+
+@Serializable
+data class QrLoginConfirmResponse(
+    val code: Int = 0,
+    val message: String? = null,
+) {
+    val isSuccess: Boolean get() = code == 200
+}
 
 // ======================= 短信验证码登录 =======================
 
