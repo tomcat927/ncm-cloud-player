@@ -77,7 +77,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.context.GlobalContext
-import java.util.UUID
+
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -112,8 +112,8 @@ fun SettingsScreen(
         if (contents.isNullOrBlank()) return@rememberLauncherForActivityResult
         // 二维码内容可能是裸 unikey，也可能是 URL（login?codekey=xxx 或 st/platform/scanlogin?codekey=xxx&login_traceId=...）
         val codekey = Regex("codekey=([0-9a-zA-Z-]+)").find(contents)?.groupValues?.get(1) ?: contents
-        val traceId = Regex("([?&])login_traceId=([^&]+)").find(contents)?.groupValues?.get(2)
-            ?: UUID.randomUUID().toString()
+        // 官方确认页在 URL 无 login_traceId 时传空串，这里保持一致
+        val traceId = Regex("([?&])login_traceId=([^&]+)").find(contents)?.groupValues?.get(2) ?: ""
         AppLogger.i("UI", "扫码成功，准备确认登录")
         scope.launch {
             snackbarHostState.showSnackbar("正在确认扫码登录…")

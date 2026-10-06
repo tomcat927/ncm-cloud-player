@@ -37,10 +37,17 @@ class AuthRepository(
     fun qrLoginUrl(key: String): String = QR_LOGIN_URL_PREFIX + key
 
     // 本 App 作为已登录扫码方，确认外部（无痕网页等）二维码的登录请求。
-    // 走官方确认页同款 server/login 接口（type=2 确认授权）；userid 必须是扫码方账号 uid。
-    // [clientTraceId] 优先取二维码 URL 里的 login_traceId，没有则由调用方生成随机 UUID。
+    // 走官方确认页同款 server/login 接口，时序对齐官方页：先 type=1 上报"已扫描"（801→802），
+    // 再 type=2 确认授权（802→803）——实测跳过 type=1 直接 type=2 会返回「授权失败」。
+    // [clientTraceId] 优先取二维码 URL 里的 login_traceId，没有则传空串（官方页同款行为）。
     suspend fun confirmQrLogin(key: String, clientTraceId: String): QrLoginConfirmResponse {
         val userid = currentUid()
+        // 官方页对 type=1 的结果不阻断，失败也继续发起 type=2
+        runCatching {
+            apiService.confirmQrLogin(
+                QrLoginConfirmRequest(key = key, type = 1, userid = userid, clientTraceId = clientTraceId)
+            )
+        }
         val resp = apiService.confirmQrLogin(
             QrLoginConfirmRequest(
                 key = key,
