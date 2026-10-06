@@ -1,6 +1,9 @@
 package com.ncmcloud.player.ui.playlist
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,6 +58,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.domain.CloudSong
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.context.GlobalContext
 
@@ -313,6 +318,13 @@ fun PlaylistCollectSheet(
     onDismiss: () -> Unit,
 ) {
     val viewModel: PlaylistViewModel = koinViewModel()
+    var actionHint by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(actionHint) {
+        if (actionHint != null) {
+            delay(2000)
+            actionHint = null
+        }
+    }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -327,6 +339,20 @@ fun PlaylistCollectSheet(
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            Text(
+                "勾选歌单即添加，取消勾选即移除；同一首歌可加入多个歌单",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            androidx.compose.animation.AnimatedVisibility(visible = actionHint != null) {
+                Text(
+                    actionHint.orEmpty(),
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
             if (state.loading) {
                 Box(
                     modifier = Modifier
@@ -355,6 +381,11 @@ fun PlaylistCollectSheet(
                                     "UI",
                                     "点击:收藏弹层-${item.name}(${if (item.contains) "移除" else "添加"})",
                                 )
+                                actionHint = if (item.contains) {
+                                    "已从《${item.name}》移除"
+                                } else {
+                                    "已添加到《${item.name}》"
+                                }
                                 viewModel.toggleCollect(item.playlistId, !item.contains)
                             }
                             .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -396,6 +427,7 @@ fun PlaylistCollectSheet(
                 TextButton(
                     onClick = {
                         AppLogger.i("UI", "点击:创建并收藏《$newName》")
+                        actionHint = "已创建歌单《$newName》并收藏本曲"
                         viewModel.createAndCollect(newName)
                         newName = ""
                     },
