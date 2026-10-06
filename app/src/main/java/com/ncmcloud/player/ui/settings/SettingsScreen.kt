@@ -117,13 +117,12 @@ fun SettingsScreen(
                     AppLogger.i("UI", "扫码确认成功")
                     snackbarHostState.showSnackbar("扫码确认成功，网页已登录")
                 }
-                .onFailure {
-                    AppLogger.e("UI", "扫码确认失败", it)
-                    snackbarHostState.showSnackbar("扫码确认失败：${it.message}")
-                }
+                        .onFailure {
+                            AppLogger.e("UI", "扫码确认失败", it)
+                            snackbarHostState.showSnackbar("扫码确认失败：${it.message}")
+                        }
         }
     }
-    val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
 
     Scaffold(
         topBar = {

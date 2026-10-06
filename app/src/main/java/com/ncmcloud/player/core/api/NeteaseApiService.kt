@@ -41,7 +41,7 @@ interface NeteaseApiService {
     suspend fun confirmQrLogin(
         @Body body: QrLoginConfirmRequest
     ): QrLoginConfirmResponse
-}
+
         // 发送短信验证码 v1（eapi）
     @POST("/eapi/middle/captcha/sent/v1")
     suspend fun sendCaptcha(
