@@ -140,7 +140,7 @@ fun SettingsScreen(
                         }.onFailure { e -> AppLogger.e("UI", "打开验证页失败", e) }
                         snackbarHostState.showSnackbar(
                             "检测到登录安全风险，请在打开的页面完成验证后重新扫码",
-                            SnackbarDuration.Long
+                            duration = SnackbarDuration.Long
                         )
                     } else {
                         AppLogger.e("UI", "扫码确认失败", it)
