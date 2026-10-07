@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -36,6 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.ncmcloud.player.core.log.AppLogger
 import com.ncmcloud.player.core.log.RemoteLogConfig
@@ -54,7 +60,7 @@ fun LogScreen(onBack: () -> Unit) {
     var logs by remember { mutableStateOf(AppLogger.getLogText()) }
     var message by remember { mutableStateOf<String?>(null) }
     var showSettings by remember { mutableStateOf(false) }
-    var config by remember { mutableStateOf(RemoteLogConfig(false, "", "", "/ncm-cloud-player/logs", null, null)) }
+    var config by remember { mutableStateOf(RemoteLogConfig(false, "", "", "", "/ncm-cloud-player/logs", null, null)) }
 
     // 系统返回键回到上一页，而不是退出应用
     BackHandler { onBack() }
@@ -168,7 +174,8 @@ private fun RemoteLogSettingsDialog(
     var enabled by remember { mutableStateOf(initial.enabled) }
     var baseUrl by remember { mutableStateOf(initial.baseUrl) }
     var username by remember { mutableStateOf(initial.username) }
-    var password by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf(initial.password) }
+    var showPassword by remember { mutableStateOf(false) }
     var targetPath by remember { mutableStateOf(initial.targetPath) }
 
     AlertDialog(
@@ -199,6 +206,16 @@ private fun RemoteLogSettingsDialog(
                     onValueChange = { password = it },
                     label = { Text("密码（留空保持原密码）") },
                     singleLine = true,
+                    visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    trailingIcon = {
+                        IconButton(onClick = { showPassword = !showPassword }) {
+                            Icon(
+                                if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                contentDescription = if (showPassword) "隐藏密码" else "显示密码",
+                            )
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
