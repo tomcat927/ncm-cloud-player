@@ -20,3 +20,4 @@
 - **参考项目 [Melodia](https://github.com/rinchao0721/Melodia)**：UI 观感与功能设计均参考它，已克隆在本机 `C:/data/vscode/android/Melodia`，直接查阅，不要重复克隆。
 - 远程日志机制见 `docs/REMOTE_LOG.md`。
 - 扫码登录其他设备的协议研究与风控结论（含 eapi/weapi 探针方法论）见 `docs/QR_SCAN_LOGIN_RESEARCH.md`。
+- 云盘歌词纠正的可行性调研（结论：网易无事后传歌词接口，功能拍板不做；重启候选路径）见 `docs/CLOUD_LYRIC_RESEARCH.md`。
