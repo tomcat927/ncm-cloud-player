@@ -108,6 +108,7 @@ fun SettingsScreen(
         initial = SettingsPreferences.DEFAULT_LYRIC_FONT_SIZE,
     )
     val updatePreferMirror by settingsPreferences.updatePreferMirror.collectAsState(initial = true)
+    val updateAutoDownload by settingsPreferences.updateAutoDownload.collectAsState(initial = true)
 
     // 扫码确认器：扫描网页上的登录二维码，用本 App 登录态确认该网页的登录
     var riskVerifyUrl by remember { mutableStateOf<String?>(null) }
@@ -180,6 +181,14 @@ fun SettingsScreen(
                         subtitle = "更新资源经公共镜像 gh-proxy.com 中转（国内直连），关闭后仅 GitHub 直连",
                         checked = updatePreferMirror,
                         onCheckedChange = { scope.launch { settingsPreferences.setUpdatePreferMirror(it) } },
+                    )
+                    HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                    SettingsSwitchRow(
+                        icon = Icons.Filled.SystemUpdateAlt,
+                        title = "自动下载更新",
+                        subtitle = "发现新版本后在 Wi-Fi 等非计费网络自动后台下载，完成后通知安装；手动点更新不受限",
+                        checked = updateAutoDownload,
+                        onCheckedChange = { scope.launch { settingsPreferences.setUpdateAutoDownload(it) } },
                     )
                     HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
                     SettingsActionRow(

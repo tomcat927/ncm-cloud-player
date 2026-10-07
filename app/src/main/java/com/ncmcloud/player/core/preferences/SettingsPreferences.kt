@@ -20,6 +20,7 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
         private val KEY_LYRIC_TRANSLATION = booleanPreferencesKey("lyric_translation_enabled")
         private val KEY_LYRIC_FONT_SIZE = intPreferencesKey("lyric_font_size")
         private val KEY_UPDATE_PREFER_MIRROR = booleanPreferencesKey("update_prefer_mirror")
+    private val KEY_UPDATE_AUTO_DOWNLOAD = booleanPreferencesKey("update_auto_download")
 
         const val DEFAULT_LYRIC_FONT_SIZE = 20
     }
@@ -36,6 +37,9 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
 
     // 更新资源（清单/APK/校验和）下载是否优先走公共镜像 gh-proxy.com（国内直连），关闭则仅 GitHub 直连
     val updatePreferMirror: Flow<Boolean> = dataStore.data.map { it[KEY_UPDATE_PREFER_MIRROR] ?: true }
+
+    // 检查到新版本时自动在非计费网络（Wi-Fi 等）后台预下载；手动点「更新」不受此开关限制
+    val updateAutoDownload: Flow<Boolean> = dataStore.data.map { it[KEY_UPDATE_AUTO_DOWNLOAD] ?: true }
 
     suspend fun setUseRealIp(value: Boolean) {
         dataStore.edit { it[KEY_USE_REAL_IP] = value }
@@ -67,5 +71,9 @@ class SettingsPreferences(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setUpdatePreferMirror(value: Boolean) {
         dataStore.edit { it[KEY_UPDATE_PREFER_MIRROR] = value }
+    }
+
+    suspend fun setUpdateAutoDownload(value: Boolean) {
+        dataStore.edit { it[KEY_UPDATE_AUTO_DOWNLOAD] = value }
     }
 }

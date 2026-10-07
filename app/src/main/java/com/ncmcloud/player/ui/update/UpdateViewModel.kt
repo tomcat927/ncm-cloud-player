@@ -7,19 +7,23 @@ import android.os.Build
 import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.ncmcloud.player.BuildConfig
 import com.ncmcloud.player.core.log.AppLogger
+import com.ncmcloud.player.core.preferences.SettingsPreferences
 import com.ncmcloud.player.update.UpdateDownloadWorker
 import com.ncmcloud.player.update.UpdateInfo
 import com.ncmcloud.player.update.UpdateService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -40,6 +44,7 @@ sealed interface UpdateState {
 class UpdateViewModel(
     private val updateService: UpdateService,
     private val context: Context,
+    private val settingsPreferences: SettingsPreferences,
 ) : ViewModel() {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
@@ -48,6 +53,9 @@ class UpdateViewModel(
 
     // 由 UpdateDialog 的生命周期回调维护，决定下载完成后能否直接拉起安装器
     private var appInForeground = false
+
+    // 「稍后」后本次会话不再弹下载进度/完成框（后台预下载继续跑，装不装由系统通知引导）
+    private var userDismissed = false
 
     fun setAppForeground(value: Boolean) {
         appInForeground = value
@@ -64,7 +72,10 @@ class UpdateViewModel(
                 .fold(
                     onSuccess = { info ->
                         when {
-                            info != null -> UpdateState.Available(info)
+                            info != null -> {
+                                maybeAutoDownload(info)
+                                UpdateState.Available(info)
+                            }
                             manual -> UpdateState.NoUpdate
                             else -> UpdateState.Idle
                         }
@@ -76,24 +87,44 @@ class UpdateViewModel(
 
     fun download() {
         val info = (_state.value as? UpdateState.Available)?.info ?: return
-        val data = workDataOf(
-            "tagName" to info.tagName,
-            "versionCode" to info.versionCode,
-            "downloadUrl" to info.downloadUrl,
-            "fallbackDownloadUrl" to info.fallbackDownloadUrl,
-            "checksumUrl" to info.checksumUrl,
-            "fallbackChecksumUrl" to info.fallbackChecksumUrl,
-            "releaseUrl" to info.releaseUrl,
-            "releaseNotes" to info.releaseNotes,
-        )
         val request = OneTimeWorkRequestBuilder<UpdateDownloadWorker>()
-            .setInputData(data)
+            .setInputData(updateWorkData(info))
             .addTag("update-download")
             .build()
+        // REPLACE 覆盖可能还挂在等 Wi-Fi 的自动预下载任务：用户明确点更新，不受网络约束
         workManager.enqueueUniqueWork("update-download", ExistingWorkPolicy.REPLACE, request)
+        userDismissed = false
         _state.value = UpdateState.Downloading(-1f)
         AppLogger.i(TAG, "已提交更新下载任务: ${info.tagName}")
     }
+
+    // 发现新版本后的后台预下载：仅非计费网络（Wi-Fi 等）执行，任务持久化、断网挂起回网续跑，
+    // 完成后由 Worker 发系统通知引导安装。可在设置里关闭（updateAutoDownload 开关）
+    private fun maybeAutoDownload(info: UpdateInfo) {
+        viewModelScope.launch {
+            val enabled = runCatching { settingsPreferences.updateAutoDownload.first() }.getOrDefault(true)
+            if (!enabled) return@launch
+            val request = OneTimeWorkRequestBuilder<UpdateDownloadWorker>()
+                .setInputData(updateWorkData(info))
+                .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.UNMETERED).build())
+                .addTag("update-download")
+                .build()
+            // KEEP：已有任务（运行中/等网络/手动提交）不打断
+            workManager.enqueueUniqueWork("update-download", ExistingWorkPolicy.KEEP, request)
+            AppLogger.i(TAG, "发现新版本，已排队后台预下载（非计费网络）: ${info.tagName}")
+        }
+    }
+
+    private fun updateWorkData(info: UpdateInfo) = workDataOf(
+        "tagName" to info.tagName,
+        "versionCode" to info.versionCode,
+        "downloadUrl" to info.downloadUrl,
+        "fallbackDownloadUrl" to info.fallbackDownloadUrl,
+        "checksumUrl" to info.checksumUrl,
+        "fallbackChecksumUrl" to info.fallbackChecksumUrl,
+        "releaseUrl" to info.releaseUrl,
+        "releaseNotes" to info.releaseNotes,
+    )
 
     fun install() {
         // 兜底路径：app 在后台时完成的下载，等用户回到 app 手动触发
@@ -152,7 +183,9 @@ class UpdateViewModel(
                 val info = infos.firstOrNull() ?: return@collect
                 when (info.state) {
                     WorkInfo.State.RUNNING -> {
-                        _state.value = UpdateState.Downloading(info.progress.getFloat("progress", -1f))
+                        if (!userDismissed) {
+                            _state.value = UpdateState.Downloading(info.progress.getFloat("progress", -1f))
+                        }
                     }
 
                     WorkInfo.State.SUCCEEDED -> {
@@ -160,7 +193,7 @@ class UpdateViewModel(
                         val tagName = info.outputData.getString("tagName").orEmpty()
                         val downloadedVersionCode = info.outputData.getLong("versionCode", 0L)
                         if (path.isNullOrBlank()) {
-                            _state.value = UpdateState.Error("下载完成但未获取到 APK 路径")
+                            if (!userDismissed) _state.value = UpdateState.Error("下载完成但未获取到 APK 路径")
                             AppLogger.e(TAG, "下载成功但输出数据缺少 apkPath")
                         } else if (downloadedVersionCode <= BuildConfig.VERSION_CODE.toLong()) {
                             // WorkManager 的完成记录会跨进程存活：每次启动都会重新上报。
@@ -171,6 +204,10 @@ class UpdateViewModel(
                                 "忽略残留下载记录: $tagName versionCode=$downloadedVersionCode <= 当前 ${BuildConfig.VERSION_CODE}",
                             )
                             runCatching { File(path).delete() }
+                            workManager.pruneWork()
+                        } else if (userDismissed) {
+                            // 点过「稍后」：不弹框不打断，装不装交给 Worker 发的系统通知
+                            AppLogger.i(TAG, "下载完成（已稍后），由系统通知引导安装: $tagName")
                             workManager.pruneWork()
                         } else if (appInForeground) {
                             // 前台：跳过 App 内确认，直接拉起系统安装器（一次确认）
@@ -186,12 +223,12 @@ class UpdateViewModel(
 
                     WorkInfo.State.FAILED -> {
                         val message = info.outputData.getString("error") ?: "下载或安装失败"
-                        _state.value = UpdateState.Error(message)
+                        if (!userDismissed) _state.value = UpdateState.Error(message)
                         AppLogger.e(TAG, "更新下载失败: $message")
                     }
 
                     WorkInfo.State.CANCELLED -> {
-                        _state.value = UpdateState.Idle
+                        if (!userDismissed) _state.value = UpdateState.Idle
                         AppLogger.w(TAG, "更新下载任务被取消")
                     }
 
@@ -202,6 +239,8 @@ class UpdateViewModel(
     }
 
     fun dismiss() {
+        // 「稍后」只收起界面：已排队的后台预下载继续跑，完成后靠系统通知引导安装
+        userDismissed = true
         _state.value = UpdateState.Idle
     }
 }
