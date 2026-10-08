@@ -2,6 +2,7 @@ package com.ncmcloud.player.playback
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
@@ -309,6 +310,7 @@ class PlayerController(
             .setTitle(song.displayTitle)
             .setArtist(song.displayArtist)
             .setAlbumTitle(song.album)
+            .setArtworkUri(song.albumPicUrl.takeIf { it.isNotBlank() }?.let(Uri::parse))
             .build()
         val item = MediaItem.Builder()
             .setUri(url)
