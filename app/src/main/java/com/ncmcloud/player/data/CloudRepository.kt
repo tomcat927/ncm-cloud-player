@@ -15,6 +15,7 @@ data class CloudDiskSummary(
 data class CloudPage(
     val songs: List<CloudSong>,
     val summary: CloudDiskSummary,
+    val hasMore: Boolean,
 )
 
 class CloudRepository(private val cloudApi: CloudApi) {
@@ -46,6 +47,7 @@ class CloudRepository(private val cloudApi: CloudApi) {
                 usedBytes = resp.size,
                 totalBytes = resp.maxSize,
             ),
+            hasMore = resp.hasMore,
         )
     }
 }
