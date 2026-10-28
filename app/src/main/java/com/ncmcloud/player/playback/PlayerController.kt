@@ -35,6 +35,11 @@ import kotlin.coroutines.resumeWithException
 
 private const val TAG = "PlayerController"
 
+enum class QueueSource {
+    DEFAULT,
+    CLOUD,
+}
+
 data class NowPlaying(
     val song: CloudSong,
     val url: String,
@@ -89,6 +94,7 @@ class PlayerController(
 
     private var queueList: List<CloudSong> = emptyList()
     private var originalQueue: List<CloudSong> = emptyList()
+    private var queueSource = QueueSource.DEFAULT
     private var currentIndexValue = -1
     private var progressJob: Job? = null
     private var lyricsJob: Job? = null
@@ -194,10 +200,15 @@ class PlayerController(
         _duration.value = 0L
     }
 
-    suspend fun playQueue(songs: List<CloudSong>, startIndex: Int = 0) {
+    suspend fun playQueue(
+        songs: List<CloudSong>,
+        startIndex: Int = 0,
+        source: QueueSource = QueueSource.DEFAULT,
+    ) {
         if (songs.isEmpty()) return
         queueList = songs
         originalQueue = songs
+        queueSource = source
         consecutiveFailures = 0
         currentIndexValue = startIndex.coerceIn(0, songs.lastIndex)
         if (_playMode.value == PlayMode.SHUFFLE) reshuffleQueue()
@@ -206,6 +217,25 @@ class PlayerController(
     }
 
     suspend fun play(song: CloudSong) = playQueue(listOf(song), 0)
+
+    /**
+     * 云盘后台分页完成后增量扩充当前云盘队列。
+     *
+     * 只对相同来源的队列生效，避免云盘预加载污染单曲或歌单队列。
+     */
+    fun appendSongsFromSource(songs: List<CloudSong>, source: QueueSource) {
+        if (queueSource != source || queueList.isEmpty() || songs.isEmpty()) return
+
+        val seen = (queueList + originalQueue).mapTo(mutableSetOf()) { it.songId }
+        val additions = songs.filter { seen.add(it.songId) }
+        if (additions.isEmpty()) return
+
+        queueList = queueList + additions
+        originalQueue = originalQueue + additions
+        publishQueue()
+        updateSkipFlags()
+        AppLogger.i(TAG, "队列追加 ${additions.size} 首，来源=$source，总队列=${queueList.size}")
+    }
 
     fun cyclePlayMode(): PlayMode {
         val next = _playMode.value.next()
@@ -265,6 +295,7 @@ class PlayerController(
         controller?.stop()
         queueList = emptyList()
         originalQueue = emptyList()
+        queueSource = QueueSource.DEFAULT
         currentIndexValue = -1
         publishQueue()
         _nowPlaying.value = null

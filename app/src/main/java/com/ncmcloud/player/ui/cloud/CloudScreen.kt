@@ -73,6 +73,9 @@ fun CloudScreen(
     val playlistViewModel: PlaylistViewModel = koinViewModel()
     val state by viewModel.state.collectAsState()
     val diskSummary by viewModel.diskSummary.collectAsState()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val hasMore by viewModel.hasMore.collectAsState()
+    val loadMoreError by viewModel.loadMoreError.collectAsState()
     val collectState by playlistViewModel.collect.collectAsState()
     var query by remember { mutableStateOf("") }
 
@@ -196,17 +199,47 @@ fun CloudScreen(
                                     )
                                 }
                                 item {
-                                    Box(
+                                    Column(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(16.dp),
-                                        contentAlignment = Alignment.Center,
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
                                     ) {
-                                        TextButton(onClick = {
-                                            AppLogger.i("UI", "点击:加载更多")
-                                            viewModel.loadNextPage()
-                                        }) {
-                                            Text("加载更多")
+                                        val totalCount = diskSummary?.songCount ?: s.songs.size
+                                        when {
+                                            loadMoreError != null -> {
+                                                Text(
+                                                    loadMoreError.orEmpty(),
+                                                    color = MaterialTheme.colorScheme.error,
+                                                    fontSize = 12.sp,
+                                                )
+                                                TextButton(onClick = viewModel::loadNextPage) {
+                                                    Text("继续加载")
+                                                }
+                                            }
+
+                                            isLoadingMore || hasMore -> {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                ) {
+                                                    CircularProgressIndicator(modifier = Modifier.size(16.dp))
+                                                    Text(
+                                                        "正在加载 ${s.songs.size}/$totalCount 首",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                }
+                                            }
+
+                                            else -> {
+                                                Text(
+                                                    "已加载全部 ${s.songs.size} 首",
+                                                    fontSize = 12.sp,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
                                         }
                                     }
                                 }
